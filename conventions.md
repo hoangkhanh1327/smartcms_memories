@@ -104,3 +104,39 @@ and is tagged `[legacy-only]` where ADR 0001 overrides it.
 *Not documented yet.* Owner will add this in a later pass. When adding it, keep frontend rules in
 this section (or their own ADR with an explicit scope note) and only promote a rule into Part 1 if
 it genuinely binds both sides.
+
+---
+
+# Part 4 — Agent working rules
+
+## Update this memory at commit time
+
+Applies to every agent tool (Claude Code, Copilot, OpenCode, Antigravity). Mirrored in the repo's
+`AGENTS.md`.
+
+**Session start**: call `memory_list` before assuming any convention. `OVERVIEW.md` is the entry
+point, and it tells you which repo you're in.
+
+**Before committing**: if the change introduces any of the below, write it here **in the same
+commit cycle**, not later.
+
+| Commit introduces | Write to |
+|---|---|
+| New feature or module | `repos/<repo>.md`, plus `contracts/` if an endpoint contract changed |
+| New architecture decision, or a deliberate break from an existing convention | new `architecture/decisions/NNNN-<slug>.md` |
+| New convention other code must follow | `conventions.md`, in the correct Part |
+| New domain term, or a common word with project-specific meaning | `glossary.md` |
+| Change to the response envelope, route prefix, or any API↔frontend contract | `conventions.md` **Part 1** — flag it as breaking for the frontend |
+
+**Do not write**: conversation logs, per-task progress, temporary notes, or bug fixes with no
+architectural consequence. This is a decision record, not a changelog — `git log` covers what
+changed. Typo fixes, lint passes, dependency bumps and concept-free refactors need no entry. When
+unsure, ask the developer instead of writing noise.
+
+**Mechanics**:
+- `reason` becomes the memory repo's commit message — write a real one.
+- Prefer `mode: "append"`; `overwrite` only when existing content is genuinely obsolete.
+- `status: "ready"` only once a decision is settled; leave `draft` while still under discussion.
+- `links` are validated on write — create the linked file first, then the file that links to it.
+- Respect scope: `architecture/decisions/` is API-side unless the ADR says otherwise. Never put a
+  backend-only rule where the frontend will read it as shared.
