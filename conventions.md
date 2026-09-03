@@ -4,8 +4,8 @@ tags:
   - conventions
 updated: '2026-09-03'
 summary: >-
-  Quy ước dùng chung. Chia 2 phần: cross-repo (API + frontend) và API-only.
-  Frontend-side sẽ thêm sau.
+  Shared conventions, split into cross-repo (API + frontend) and API-only parts.
+  Frontend part to be added later.
 status: ready
 links:
   - architecture/decisions/0001-new-feature-module-conventions.md
@@ -13,12 +13,13 @@ links:
 ---
 # Conventions
 
-This file has **two parts**. Do not apply the API-only part to frontend code.
+This file has **two active parts**. Do not apply the API-only part to frontend code.
 
 - **Part 1 — Cross-repo**: binds both the API and the CMS web panel. Changing anything here is a
   breaking change for the other side.
 - **Part 2 — API-only** (`api-smart-cms`): backend/NestJS specifics.
 - **Part 3 — Frontend-only**: not written yet; owner will add it in a later pass.
+- **Part 4 — Agent working rules**: how agents must use and update this memory.
 
 ---
 
@@ -109,10 +110,34 @@ it genuinely binds both sides.
 
 # Part 4 — Agent working rules
 
+## Write this memory in English
+
+**All memory content is English.** Every file in this repo — body prose, headings, and the
+frontmatter `title` / `summary` fields — is written in English, regardless of the language the
+developer used in the conversation that produced it. English is materially cheaper in tokens than
+Vietnamese for the same content, and this memory is re-read at the start of every session by every
+agent, so the cost is paid repeatedly.
+
+The single exception is a **term of art that must be quoted exactly**: a Vietnamese domain word, a
+DB value, an enum name, a UI label, or a `reason` a human wrote. Keep those verbatim and add an
+English gloss:
+
+```
+- **doi soat** (`DB_DOISOAT_WRITE`) — reconciliation/settlement between partners.
+```
+
+This applies to `memory_write` content and to the `reason` argument. It does **not** ask anyone to
+change how they talk: converse with the developer in whatever language they use, then write the
+memory in English.
+
+If you find an existing memory file written in another language, rewrite it into English the next
+time you touch that file — do not leave a mixed-language file behind.
+
 ## Update this memory at commit time
 
 Applies to every agent tool (Claude Code, Copilot, OpenCode, Antigravity). Mirrored in the repo's
-`AGENTS.md`.
+`AGENTS.md`, and enforced for Claude Code by a `PreToolUse` hook on `git commit`
+(`.claude/hooks/memory-commit-reminder.sh`) that fires when new module files are staged.
 
 **Session start**: call `memory_list` before assuming any convention. `OVERVIEW.md` is the entry
 point, and it tells you which repo you're in.
@@ -134,7 +159,7 @@ changed. Typo fixes, lint passes, dependency bumps and concept-free refactors ne
 unsure, ask the developer instead of writing noise.
 
 **Mechanics**:
-- `reason` becomes the memory repo's commit message — write a real one.
+- `reason` becomes the memory repo's commit message — write a real one, in English.
 - Prefer `mode: "append"`; `overwrite` only when existing content is genuinely obsolete.
 - `status: "ready"` only once a decision is settled; leave `draft` while still under discussion.
 - `links` are validated on write — create the linked file first, then the file that links to it.
