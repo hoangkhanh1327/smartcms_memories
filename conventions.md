@@ -2,23 +2,26 @@
 title: Conventions
 tags:
   - conventions
-updated: '2026-09-03'
+updated: '2026-09-04'
 summary: >-
-  Shared conventions, split into cross-repo (API + frontend) and API-only parts.
-  Frontend part to be added later.
+  Shared conventions, split into cross-repo (API + frontend), API-only and
+  frontend-only parts. All four parts are now written.
 status: ready
 links:
   - architecture/decisions/0001-new-feature-module-conventions.md
+  - architecture/decisions/0002-frontend-mantine-design-system.md
   - repos/api.md
+  - repos/web.md
 ---
 # Conventions
 
-This file has **two active parts**. Do not apply the API-only part to frontend code.
+This file has **four active parts**. Do not apply the API-only part to frontend code, or the
+frontend-only part to backend code.
 
 - **Part 1 — Cross-repo**: binds both the API and the CMS web panel. Changing anything here is a
   breaking change for the other side.
 - **Part 2 — API-only** (`api-smart-cms`): backend/NestJS specifics.
-- **Part 3 — Frontend-only**: not written yet; owner will add it in a later pass.
+- **Part 3 — Frontend-only** (`smartcms` web): React/Vite specifics.
 - **Part 4 — Agent working rules**: how agents must use and update this memory.
 
 ---
@@ -42,10 +45,15 @@ Every endpoint, legacy and new, returns this shape:
 Frontend clients should read `result` / `status` for success detection, not the presence of `data`
 (a successful empty response still carries `data`).
 
+On the frontend this envelope is typed `CommonDataResponse2<T>` in `src/@types/common.ts`. Note how
+it is unwrapped — see Part 3 and `repos/web.md` § API layer.
+
 ## Route prefix
 
 All API routes live under the prefix from the backend's `BASE_URL` env var, deployed as `api/v1`
-→ `https://<host>/api/v1/<path>`.
+→ `https://<host>/api/v1/<path>`. The frontend reaches it through `VITE_API_URL` →
+`appConfig.apiUrl` → `BaseService`'s `baseURL`; several *other* backends have their own
+`VITE_API_*_URL` and their own service module.
 
 ## Bulk delete
 
@@ -100,11 +108,86 @@ and is tagged `[legacy-only]` where ADR 0001 overrides it.
 
 ---
 
-# Part 3 — Frontend-only conventions (CMS web panel)
+# Part 3 — Frontend-only conventions (`smartcms` web panel)
 
-*Not documented yet.* Owner will add this in a later pass. When adding it, keep frontend rules in
-this section (or their own ADR with an explicit scope note) and only promote a rule into Part 1 if
-it genuinely binds both sides.
+Applies to `/home/khanhth/projects/admin2/web`. See [`repos/web.md`](repos/web.md) for repo shape
+and [ADR 0002](architecture/decisions/0002-frontend-mantine-design-system.md) for the design-system
+decision. These rules are ratified in the repo's own (Vietnamese) `.ai/core/constitution.md` and
+expanded in `.ai/core/project-rules.md`.
+
+## Architectural rules
+
+1. **The service layer is the only API boundary.** No component, view, store slice or utility calls
+   axios or `fetch` directly — everything goes through a function in the module's `services/`
+   folder that uses `ApiService`.
+2. **Views are thin.** A `views/*.tsx` may only: `injectReducer`, set `document.title`, and return a
+   `<Container>` wrapping the list/form component plus its dialog provider. No fetching, no
+   business logic.
+3. **UI state in the slice, server state in RTK Query.** Dialog open/close, visible columns and
+   filters live in the Redux slice; paginated lists and detail records live in the RTK Query
+   service. **Row selection is the exception** — it belongs to the container (rule 8).
+4. **No business logic in components.** Validation → Yup schema co-located with the form; derived
+   data → `utils/`; workflow decisions → the RTK Query mutation hooks.
+5. **Every form input is validated before submission.** A Yup schema is mandatory. New forms bind it
+   with `@mantine/form` + `mantine-form-yup-resolver`; Formik + Yup is legacy-only.
+6. **Reducers are injected lazily per view.** Never register a feature reducer in the global
+   `rootReducer.ts`.
+7. **List pages compose as Container + ActionBar + a shared DataTable wrapper.** The container owns
+   query params, fetching, pagination and selected ids. Pick the wrapper by need:
+   `NormalDataTable` is the default (~351 import sites); `SelectableDataTable` **only** when
+   checkbox selection drives bulk actions (~59 sites).
+8. **Selection state has exactly one owner** — the container. Pass ids down to both the table and
+   the action bar; do not duplicate them in `ActionBar`, in the table wrapper, or in the slice.
+9. **No ad-hoc HTML/CSS control styles.** New controls come from `@mantine/core`, falling back to
+   the shared wrappers only where Mantine has no equivalent wired up.
+
+## Component placement — the decision order
+
+1. **Mantine first.** Reach for `@mantine/core` before any legacy bucket (`@/components/ui`, Kendo,
+   `twin.macro`). For the actual API, read `node_modules/@mantine/*/lib/**/*.d.ts` — **not**
+   `mantine_llm.txt`, which is only a link index (ADR 0002 § Trap).
+2. **One consumer → the component stays in its module** (`src/modules/<domain>/<Feature>/components/`).
+   Do not pre-emptively promote.
+3. **Two or more consumers → it MUST move to `src/components/shared`.** Hard rule, not a judgment
+   call: promote it in the same change. Two symptoms mean the rule is *already* broken and a
+   promotion is owed — a module importing from another module's `components/`, or two
+   near-identical components differing only in data source or labels.
+4. **`shared/` is organised by category folder, like a component library — never a flat dump.**
+   Categories, each with its own barrel: `inputs/`, `feedback/`, `layout/`, `data-display/`,
+   `actions/`, `utils/`. `src/components/shared/index.ts` re-exports every category barrel, so
+   `@/components/shared` stays the single import path — always import from there, never deep into
+   `shared/<category>/<File>`. *Migration is incremental*: `shared/` is still 26 loose files; new
+   components go into a category immediately, existing ones move when next touched. Never attempt
+   it as one sweeping change.
+5. **`ui/`, `custom/` and `common/` are legacy buckets** — extend only to fix an existing component
+   in place.
+
+## Naming
+
+| Thing | Convention |
+|---|---|
+| View files | kebab-case (`campaign-list.tsx`) |
+| Component files/folders | PascalCase (`ReferralCampaignForm/`) |
+| Service functions | `api` + verb + entity, camelCase (`apiGetGamiCampain`) |
+| Redux slice | `<module>Slice.ts`, name constant `<MODULE>_SLICE_NAME` |
+| RTK Query service | `<module>Queries.ts` · Reducer: `<module>Reducer.ts` |
+| Types | PascalCase; requests end `Request`, responses end `Response` |
+| Entity field constants | SCREAMING_SNAKE_CASE (`MENU_ID`) — mirrors the API's field naming |
+
+A secondary view inside a module (e.g. a report screen) gets its **own** slice+reducer pair
+(`referralCampaignReportSlice.ts`), not a fold-in to the primary one.
+
+Imports use the `@/` alias for anything cross-module; module-local types are imported relatively.
+
+## Design tokens
+
+`docs/design-system.MD` (Tailwind: colors as `themeColor` + `primaryColorLevel`, the `CONTROL_SIZES`
+scale, breakpoints) is the **source of truth**, and `src/configs/mantine.theme.ts` derives Mantine's
+theme from it at build time. Do not hardcode a color or a control height, and do not let Mantine
+fall back to its stock theme.
+
+**The UI language is Vietnamese** — page titles, labels, validation messages and Swagger-facing
+strings are Vietnamese even though identifiers are English.
 
 ---
 
@@ -151,7 +234,7 @@ commit cycle**, not later.
 | New architecture decision, or a deliberate break from an existing convention | new `architecture/decisions/NNNN-<slug>.md` |
 | New convention other code must follow | `conventions.md`, in the correct Part |
 | New domain term, or a common word with project-specific meaning | `glossary.md` |
-| Change to the response envelope, route prefix, or any API↔frontend contract | `conventions.md` **Part 1** — flag it as breaking for the frontend |
+| Change to the response envelope, route prefix, or any API↔frontend contract | `conventions.md` **Part 1** — flag it as breaking for the other side |
 
 **Do not write**: conversation logs, per-task progress, temporary notes, or bug fixes with no
 architectural consequence. This is a decision record, not a changelog — `git log` covers what
@@ -163,5 +246,6 @@ unsure, ask the developer instead of writing noise.
 - Prefer `mode: "append"`; `overwrite` only when existing content is genuinely obsolete.
 - `status: "ready"` only once a decision is settled; leave `draft` while still under discussion.
 - `links` are validated on write — create the linked file first, then the file that links to it.
-- Respect scope: `architecture/decisions/` is API-side unless the ADR says otherwise. Never put a
-  backend-only rule where the frontend will read it as shared.
+- Respect scope: an ADR under `architecture/decisions/` states its own scope in its Scope section.
+  ADR 0001 is **API-only**; ADR 0002 is **frontend-only**. Never put a rule from one side where the
+  other will read it as shared.
