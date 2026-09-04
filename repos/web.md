@@ -14,6 +14,7 @@ status: ready
 links:
   - architecture/decisions/0002-frontend-mantine-design-system.md
   - conventions.md
+  - architecture/decisions/0003-frontend-shared-tables-tanstack.md
 ---
 # `smartcms` web — Frontend
 
@@ -155,3 +156,25 @@ A `.codegraph/` index exists — `codegraph query -p <repo> <term>` beats greppi
 
 Frontend coding conventions are in `conventions.md` Part 3; the design-system decision is
 [ADR 0002](../architecture/decisions/0002-frontend-mantine-design-system.md).
+
+## Data tables — `shared/tables`, and `custom/DataTable` is frozen
+
+Added 2026-09-04, see [ADR 0003](../architecture/decisions/0003-frontend-shared-tables-tanstack.md).
+
+`src/components/shared/tables` is a **TanStack Table v8 + TanStack Virtual** rebuild of the Kendo
+Grid wrappers, exporting `NormalTable`, `SelectableTable`, `EditableTable`, `SortTable`, `SpanTable`,
+`TreeTable` plus `DataTableCore` and the `CommonTableColumnProps` / `TableCellProps` /
+`TablePageChangeEvent` type family from one barrel: `@/components/shared/tables`. Its `README.md`
+holds the authoritative old→new symbol mapping and the list of deliberate behaviour changes.
+
+**`src/components/custom/DataTable` is frozen** — not edited, not extended, not chosen for new work;
+it only serves screens not yet migrated. ~870 files still import it and ~3,095 `renderCell`
+callbacks return raw `<td>` elements, which is exactly why the contract was kept identical: a screen
+migrates by changing imports, and a `renderCell` returning a `<td>` still works (the element is
+adopted as the cell, with frozen-column class/offsets merged in). Kendo packages and
+`@progress/kendo-theme-default/dist/all.css` (imported at `src/App.tsx`) stay until the last screen
+moves.
+
+So the "Also present: `@tanstack/react-table` + `react-virtual`" line in the Stack section above is
+no longer incidental — it is the table stack. `src/modules/configs/referral` already imports from
+`@/components/shared/tables`; copy it rather than an older list screen.
