@@ -4,13 +4,14 @@ tags:
   - repo
   - api
   - nestjs
-updated: '2026-09-03'
+updated: '2026-09-04'
 summary: >-
   Backend API for the CMS project. NestJS 10 + Fastify, multi-store. Large and
   inconsistent repo — new code follows ADR 0001, never copy the legacy patterns.
 status: ready
 links:
   - architecture/decisions/0001-new-feature-module-conventions.md
+  - contracts/ai-dubbing.md
 ---
 # `api-smart-cms` — API-side
 
@@ -68,3 +69,13 @@ from whichever file you open first.
    imports — along with the 9 tests that covered them (17 → 8 tests, all passing; typecheck clean).
    Note for future cleanups: those methods *had* test coverage, so a grep that excludes `*.spec.ts`
    under-reports what a removal will break.
+
+## Documented feature contracts
+
+| Module | Path in repo | Contract |
+|---|---|---|
+| **AI Dubbing** — AI voice-over / dubbing pipeline (video job → language task → preview review → multi-audio final output) | `src/modules/content/ai_dubling/` (folder spelled without the second `b`) | [`contracts/ai-dubbing.md`](../contracts/ai-dubbing.md) |
+
+Read the contract before building or changing the frontend screens for one of these — it records
+the request/response shapes, the status machines and the known dead filters, which the controllers
+alone do not tell you.
