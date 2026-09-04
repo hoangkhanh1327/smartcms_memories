@@ -2,7 +2,7 @@
 title: Glossary
 tags:
   - glossary
-updated: '2026-09-03'
+updated: '2026-09-04'
 summary: >-
   Domain terms shared across repos. English definitions; Vietnamese terms of art
   kept verbatim with a gloss.
@@ -44,3 +44,24 @@ after the dash. Do not translate away an identifier that appears in the code.
 > Seeded from terms verified during the 2026-09-03 core-refresh of the referral module and the
 > `DB_TYPE` enum. Still `draft` — the repo has many more domain terms (content, comic, loyalty,
 > sporthub, b2b) that are not captured here yet.
+
+## Frontend terms (`smartcms` web)
+
+Added 2026-09-04 when the frontend repo was documented — see [`repos/web.md`](repos/web.md).
+
+- **SmartCMS** — the project's own name, used for both sides (`smart-cms` in the GitLab group,
+  `smartcms` in the pm2 process names). "CMS web panel" and "SmartCMS Admin" refer to the same
+  frontend app.
+- **elstar** — the admin dashboard template the frontend was forked from. It is still the
+  `package.json` `name` and shows up in template component paths. It is **not** the project name
+  and carries no meaning; do not treat `elstar` as a domain concept.
+- **`CommonDataResponse2<T>`** (`src/@types/common.ts`) — the frontend's type for the shared
+  response envelope. The `2` is a version suffix on the type, not on the API.
+- **`injectReducer`** — the frontend's lazy reducer registration. Each view calls it once on mount;
+  a feature's reducer is never added to the global `rootReducer.ts`.
+- **`NormalDataTable` / `SelectableDataTable`** — the two shared data-table wrappers in
+  `@/components/custom/DataTable`. Kendo-backed, and the one place new frontend code still lands on
+  the legacy UI kit because Mantine has no table. `Selectable` is only for checkbox-driven bulk
+  actions.
+- **ActionBar** — the per-module header/filter/bulk-action bar that sits above a list table. A
+  naming convention, not a shared component: each module has its own.
