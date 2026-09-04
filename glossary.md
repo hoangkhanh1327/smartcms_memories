@@ -9,6 +9,7 @@ summary: >-
 status: draft
 links:
   - repos/api.md
+  - contracts/ai-dubbing.md
 ---
 # Glossary
 
@@ -65,3 +66,38 @@ Added 2026-09-04 when the frontend repo was documented — see [`repos/web.md`](
   actions.
 - **ActionBar** — the per-module header/filter/bulk-action bar that sits above a list table. A
   naming convention, not a shared component: each module has its own.
+
+## AI Dubbing terms
+
+Added 2026-09-04 from `src/modules/content/ai_dubling/` — full contract in
+[`contracts/ai-dubbing.md`](contracts/ai-dubbing.md).
+
+- **AI Dubbing** (folder `ai_dubling`, queue prefix `dubbing-v2`) — the AI voice-over pipeline that
+  turns one source video into extra dubbed audio tracks. The repo folder is misspelled (one `b`);
+  the concept is *dubbing*. **thuyet_minh** (`thuyết minh`, the JWT `task` claim sent to BigData) is
+  the Vietnamese term for the same thing — voice-over narration.
+- **Video Job** (`video_job`) — one source video file being processed. Parent of everything else.
+- **Language Task** (`language_task`) — one target-language audio track for a Video Job: AI
+  translation, generated preview, and the operator's approve/reject decision. Today exactly one is
+  created per Video Job.
+- **Final Output** (`final_output`) — the muxed multi-audio video built from approved Language
+  Tasks in a chosen `order`. At most **2 alive** per Video Job (alive = not `DELETED`/`FAILED`).
+- **Preview** (`previewUrl`, `previewReadyAt`) — the reviewable render an operator watches before
+  approving. Unapproved previews **expire after 15 days** (hourly cron → `EXPIRED`).
+- **softsub / hardsub** (`subType` 1 / 2) — softsub keeps subtitles as a separate track and is the
+  voice-over path; hardsub burns them into the picture. They hit different BigData endpoints
+  (`/api/voiceovers` vs `/api/hardsub`) with different JWT secrets.
+- **shortedSub** (`shorted_sub`, `shorten_sub: 'on'|'off'`) — ask the AI to condense subtitle text
+  so the dubbed speech fits the timing. Spelled "shorted", not "shortened", in both DB and payload.
+- **FTP A** — the media file store the pipeline reads the source video from and writes the final
+  output back to. `metaData.path` and `outputPath` are paths on it. **NFS** is the separate
+  intermediate store for extracted/translated audio (`{id}__source.wav`, `{id}__translated.wav`).
+- **BigData** (`DOMAIN_BIGDATA_FOR_SOFTSUB` / `_HARDSUB`) — the VNPT AI partner service that does
+  the actual translation and speech synthesis. Referred to as `ai_server` in `job_step_log.executor`.
+- **Executor** (`cms` | `transcoder` | `ai_server`) — which system performed a logged pipeline step.
+  `transcoder` is the separate BullMQ worker service, not this API.
+- **CAS update** (`updateStatusWithCAS`) — compare-and-set: a status change that only applies if the
+  row is still in the expected status. A lost race surfaces to the client as 409.
+- **Outbox event** (`outbox_event`) — a durable record written in the same breath as a queue
+  dispatch, so a reconciliation cron can re-enqueue work the queue never received. Internal; never
+  exposed to the frontend.
