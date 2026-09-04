@@ -10,6 +10,7 @@ status: ready
 links:
   - architecture/decisions/0001-new-feature-module-conventions.md
   - architecture/decisions/0002-frontend-mantine-design-system.md
+  - architecture/decisions/0003-frontend-shared-tables-tanstack.md
   - repos/api.md
   - repos/web.md
 ---
@@ -66,6 +67,11 @@ Entity `status` columns are `tinyint`, `0` = INACTIVE / `1` = ACTIVE. Transactio
 differ per table (e.g. referral transactions use `0` PROCESSING / `1` SUCCESS / `2` FAILED) — check
 the specific table rather than assuming.
 
+**`0` is a real value, not "empty".** Because ACTIVE/INACTIVE is `1`/`0`, any frontend code that
+guards a status with `||` (`value || ''`, `status || undefined`) silently turns INACTIVE into "no
+value" — a select blanks itself, a filter drops out of the query. Use `??` for status, ids and any
+other numeric domain value. Same trap server-side in a `if (!status)` guard.
+
 ---
 
 # Part 2 — API-only conventions (`api-smart-cms`)
@@ -110,9 +116,10 @@ and is tagged `[legacy-only]` where ADR 0001 overrides it.
 
 # Part 3 — Frontend-only conventions (`smartcms` web panel)
 
-Applies to `/home/khanhth/projects/admin2/web`. See [`repos/web.md`](repos/web.md) for repo shape
-and [ADR 0002](architecture/decisions/0002-frontend-mantine-design-system.md) for the design-system
-decision. These rules are ratified in the repo's own (Vietnamese) `.ai/core/constitution.md` and
+Applies to `/home/khanhth/projects/admin2/web`. See [`repos/web.md`](repos/web.md) for repo shape,
+[ADR 0002](architecture/decisions/0002-frontend-mantine-design-system.md) for the design-system
+decision and [ADR 0003](architecture/decisions/0003-frontend-shared-tables-tanstack.md) for data
+tables. These rules are ratified in the repo's own (Vietnamese) `.ai/core/constitution.md` and
 expanded in `.ai/core/project-rules.md`.
 
 ## Architectural rules
@@ -132,10 +139,12 @@ expanded in `.ai/core/project-rules.md`.
    with `@mantine/form` + `mantine-form-yup-resolver`; Formik + Yup is legacy-only.
 6. **Reducers are injected lazily per view.** Never register a feature reducer in the global
    `rootReducer.ts`.
-7. **List pages compose as Container + ActionBar + a shared DataTable wrapper.** The container owns
-   query params, fetching, pagination and selected ids. Pick the wrapper by need:
-   `NormalDataTable` is the default (~351 import sites); `SelectableDataTable` **only** when
-   checkbox selection drives bulk actions (~59 sites).
+7. **List pages compose as Container + ActionBar + a shared table.** The container owns query
+   params, fetching, pagination and selected ids. Tables come from
+   **`@/components/shared/tables`** — `NormalTable` is the default, `SelectableTable` **only** when
+   checkbox selection drives bulk actions. The Kendo-backed `custom/DataTable/*DataTable` wrappers
+   are **frozen**: still imported by not-yet-migrated screens, never edited, never chosen for new
+   work (ADR 0003).
 8. **Selection state has exactly one owner** — the container. Pass ids down to both the table and
    the action bar; do not duplicate them in `ActionBar`, in the table wrapper, or in the slice.
 9. **No ad-hoc HTML/CSS control styles.** New controls come from `@mantine/core`, falling back to
@@ -145,7 +154,9 @@ expanded in `.ai/core/project-rules.md`.
 
 1. **Mantine first.** Reach for `@mantine/core` before any legacy bucket (`@/components/ui`, Kendo,
    `twin.macro`). For the actual API, read `node_modules/@mantine/*/lib/**/*.d.ts` — **not**
-   `mantine_llm.txt`, which is only a link index (ADR 0002 § Trap).
+   `mantine_llm.txt`, which is only a link index (ADR 0002 § Trap). The one widget class Mantine
+   does not cover is the **data table**: that comes from `@/components/shared/tables` (ADR 0003),
+   never from Kendo directly.
 2. **One consumer → the component stays in its module** (`src/modules/<domain>/<Feature>/components/`).
    Do not pre-emptively promote.
 3. **Two or more consumers → it MUST move to `src/components/shared`.** Hard rule, not a judgment
@@ -154,13 +165,15 @@ expanded in `.ai/core/project-rules.md`.
    near-identical components differing only in data source or labels.
 4. **`shared/` is organised by category folder, like a component library — never a flat dump.**
    Categories, each with its own barrel: `inputs/`, `feedback/`, `layout/`, `data-display/`,
-   `actions/`, `utils/`. `src/components/shared/index.ts` re-exports every category barrel, so
-   `@/components/shared` stays the single import path — always import from there, never deep into
-   `shared/<category>/<File>`. *Migration is incremental*: `shared/` is still 26 loose files; new
-   components go into a category immediately, existing ones move when next touched. Never attempt
-   it as one sweeping change.
+   `actions/`, `utils/`, `tables/`. `src/components/shared/index.ts` re-exports every category
+   barrel, so `@/components/shared` stays the single import path — always import from there, never
+   deep into `shared/<category>/<File>`. (`tables/` is the exception that proves the rule's point:
+   it is imported as `@/components/shared/tables`, its own barrel, because it is a subsystem rather
+   than a component.) *Migration is incremental*: `shared/` is still 26 loose files; new components
+   go into a category immediately, existing ones move when next touched. Never attempt it as one
+   sweeping change.
 5. **`ui/`, `custom/` and `common/` are legacy buckets** — extend only to fix an existing component
-   in place.
+   in place, and `custom/DataTable` not even for that (ADR 0003).
 
 ## Naming
 
@@ -247,5 +260,5 @@ unsure, ask the developer instead of writing noise.
 - `status: "ready"` only once a decision is settled; leave `draft` while still under discussion.
 - `links` are validated on write — create the linked file first, then the file that links to it.
 - Respect scope: an ADR under `architecture/decisions/` states its own scope in its Scope section.
-  ADR 0001 is **API-only**; ADR 0002 is **frontend-only**. Never put a rule from one side where the
-  other will read it as shared.
+  ADR 0001 is **API-only**; ADR 0002 and ADR 0003 are **frontend-only**. Never put a rule from one
+  side where the other will read it as shared.
