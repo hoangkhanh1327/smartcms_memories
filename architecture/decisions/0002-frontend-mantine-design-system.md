@@ -10,14 +10,18 @@ updated: '2026-09-04'
 summary: >-
   FRONTEND-SCOPED. New UI in the smartcms web repo is built on Mantine 7; Kendo
   React and twin.macro are maintain-only legacy; Mantine's theme is derived from
-  the repo's Tailwind tokens. Does not apply to the API repo.
+  the repo's Tailwind tokens. Does not apply to the API repo. Amended by ADR
+  0003 — data tables now come from shared/tables, not custom/DataTable.
 status: ready
 links:
   - conventions.md
+  - architecture/decisions/0003-frontend-shared-tables-tanstack.md
 ---
 # ADR 0002 — Mantine 7 is the design system for new frontend UI
 
-**Status**: accepted · **Date**: 2026-09-03 · **Decided by**: project owner
+**Status**: accepted, **amended 2026-09-04 by**
+[ADR 0003](0003-frontend-shared-tables-tanstack.md) (data tables) · **Date**: 2026-09-03 ·
+**Decided by**: project owner
 
 ## Scope — read this first
 
@@ -74,24 +78,26 @@ Mantine `size="xs"` control renders at the same height as the legacy `@/componen
 next to it, so mixing the two in one toolbar does not misalign.
 
 **The split is by widget class, not by module.** `configs/referral` — the reference module — mixes
-both kits deliberately:
+kits deliberately:
 
 | Concern | New code uses |
 |---|---|
 | Form state + validation | `@mantine/form` + `mantine-form-yup-resolver` |
 | Inputs, layout, buttons | `@mantine/core` |
 | Date inputs / file upload / toasts / rich text | `@mantine/dates` / `@mantine/dropzone` / `@mantine/notifications` / `@mantine/tiptap` |
-| **Data tables** | **still `custom/DataTable/NormalDataTable`** (Kendo-backed) |
+| **Data tables** | **`@/components/shared/tables`** (TanStack) — see the amendment below |
 | Page shell | `shared/Container`, `shared/StickyFooter`, `custom/layouts/Header` |
 
-**There is no Mantine data table in this codebase.** Tables are the one area where new work still
-lands on the Kendo-lineage wrapper — a deliberate exception, not a violation. Keep the exception
-confined to the wrapper: reach Kendo's event types through the wrapper's own prop types rather than
-importing `@progress/*` in module code. The pattern to copy is in `ReferralCampaignList.tsx`:
-
-```ts
-Parameters<NonNullable<CommonTableProps['onPageChange']>>[0]
-```
+**Amended 2026-09-04 — the data-table exception is closed.** As originally written, this ADR said
+there was no Mantine data table and that new table work therefore still landed on the Kendo-backed
+`custom/DataTable/NormalDataTable`. Mantine still has no data grid, but the fallback is no longer
+Kendo: [ADR 0003](0003-frontend-shared-tables-tanstack.md) makes
+**`@/components/shared/tables`** (TanStack Table v8 + Virtual) the table implementation for all new
+and migrated work, and **freezes `custom/DataTable`** — imported by not-yet-migrated screens, never
+edited. The original advice to reach Kendo event types through the wrapper's prop types rather than
+importing `@progress/*` survives in a stronger form: `shared/tables` exports plain
+`TableCellProps` / `TablePageChangeEvent` / … types, so module code needs no `@progress/*` import at
+all. `ReferralCampaignList.tsx` is still the pattern to copy; it now imports from `shared/tables`.
 
 ## Trap — do not look up Mantine APIs the way the repo tells you to
 
