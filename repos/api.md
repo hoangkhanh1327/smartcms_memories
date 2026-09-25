@@ -4,7 +4,7 @@ tags:
   - repo
   - api
   - nestjs
-updated: '2026-09-04'
+updated: '2026-09-25'
 summary: >-
   Backend API for the CMS project. NestJS 10 + Fastify, multi-store. Large and
   inconsistent repo — new code follows ADR 0001, never copy the legacy patterns.
@@ -79,3 +79,28 @@ from whichever file you open first.
 Read the contract before building or changing the frontend screens for one of these — it records
 the request/response shapes, the status machines and the known dead filters, which the controllers
 alone do not tell you.
+
+## Menu permissions (RBAC) and permission sync
+
+Added 2026-09-25 by feature `006-route-permission-sync`.
+
+- A **permission** is a `cmssmart_admin_menu` row with `menu_level = 4` whose `menu_key` equals a
+  handler's `@RouteInfo({ name })`. Its `menu_parent` is the menu whose `menu_key` equals the
+  controller's class-level `@RouteInfo({ menu_key })`. Groups store granted keys as a CSV in
+  `admin_group.permissions`; `RouteNameInterceptor` only checks `permissions.includes(name)` —
+  the parent is for the CMS tree, not for enforcement. Handlers without a method-level `name` are
+  not permission-checked at all.
+- **`POST {BASE_URL}/administration/permission-sync`** (module
+  `src/modules/administration/permission-sync/`, ADR 0001 shape) scans every controller's
+  `@RouteInfo` via `DiscoveryService` and reconciles level-4 rows:
+  - body `{ "dry_run": boolean }` — **defaults to a dry run**; only `false` / `"false"` writes.
+  - creates missing permissions and updates `menu_name` (from `desc`) / `menu_parent` of existing
+    ones; **never deletes** — rows no longer in code are reported as `orphans`.
+  - skips and reports: controller without `menu_key`, parent menu not found, ambiguous parent
+    (duplicate `menu_key` in the DB, or one `name` under several `menu_key`s), `name` already used
+    by a non-permission menu, duplicate level-4 rows.
+  - writes in one transaction (one batched INSERT, one CASE UPDATE), audit-logged via
+    `LogActionService` (`module: permission-sync.sync`); an in-process lock returns 409 for a
+    concurrent write. Guarded by its own permission `permission-sync.sync` under `menu-config`.
+- The old `GET /route` (`src/modules/routes/`, public, deleted every level-4 row) and
+  `MenuConfigService.addMenuDynamic` / `deleteMenuDynamic` were removed.
