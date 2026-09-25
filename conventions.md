@@ -97,6 +97,23 @@ fails open and still issues the access token. Sign-out is client-side only (it c
 tokens) — there is no logout endpoint, and a leaked refresh token stays valid until it expires
 unless the user is locked. Rotating `JWT_SECRET` invalidates every session once.
 
+## Menu permissions come from `@RouteInfo({ name })`
+
+Introduced 2026-09-25 by feature `006-route-permission-sync` (API repo).
+
+- A permission's key **is** the handler's `@RouteInfo({ name })` string (e.g. `user.list`). That
+  string is the contract between API code and the CMS: renaming it in code orphans the old key
+  in every group's `admin_group.permissions` CSV.
+- Permissions (level-4 menu rows) are generated from code by
+  `POST {BASE_URL}/administration/permission-sync` (dry run by default; send
+  `{ "dry_run": false }` to write). Do not hand-create a permission on the Menu Manager for a
+  route that already declares a `name` — run the sync instead. Manual entries are only needed for
+  keys that exist in no controller.
+- The sync never deletes; rows no longer in code are listed as `orphans` for an admin to remove.
+- To make a new controller's permissions syncable: put `@RouteInfo({ menu_key })` on the class,
+  matching an **existing, unique** menu `menu_key`, and `@RouteInfo({ name, desc, path })` on each
+  handler (`desc` becomes the permission's display name).
+
 ## Bulk delete
 
 Bulk deletes are `POST <resource>/delete` with an `ids` body — **not** `DELETE <resource>/:id`.
