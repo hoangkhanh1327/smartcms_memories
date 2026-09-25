@@ -2,7 +2,7 @@
 title: Conventions
 tags:
   - conventions
-updated: '2026-09-04'
+updated: '2026-09-25'
 summary: >-
   Shared conventions, split into cross-repo (API + frontend), API-only and
   frontend-only parts. All four parts are now written.
@@ -55,6 +55,30 @@ All API routes live under the prefix from the backend's `BASE_URL` env var, depl
 → `https://<host>/api/v1/<path>`. The frontend reaches it through `VITE_API_URL` →
 `appConfig.apiUrl` → `BaseService`'s `baseURL`; several *other* backends have their own
 `VITE_API_*_URL` and their own service module.
+
+## Authentication: token lifetime, renewal and error semantics
+
+Introduced 2026-09-25 by feature `005-jwt-auth-hardening` (API repo). **Breaking for both sides —
+deploy the API and the web panel together.**
+
+- The API signs JWTs with the `JWT_SECRET` env var (no hardcoded secret). Token lifetime is
+  `JWT_EXPIRES_IN` (default `1d`); the absolute session cap is `JWT_MAX_SESSION` (default `7d`),
+  counted from the `auth_time` claim set at login.
+- **Sliding renewal**: when an authenticated request carries a token past half its lifetime, and
+  the DB confirmed the user active within the last 60 s, the API returns a fresh token in the
+  **`x-refresh-token`** response header (exposed via CORS). The new token keeps the original
+  `auth_time`, and its `exp` never exceeds `auth_time + JWT_MAX_SESSION` — users re-login at least
+  every 7 days.
+- The frontend's `BaseService` replaces `auth.session.token` with that header's value on any
+  non-401 response. Only `api-smart-cms` issues it; the other `VITE_API_*` backends do not.
+- **Status codes**:
+  - `401` — the session is invalid (missing/bad/expired token, user deleted, or user
+    `status ≠ 1`). The frontend signs out.
+  - `503` — temporary infrastructure failure (e.g. the `DB_MEMBER` connection is lost). The
+    frontend must **not** sign out; show the message and let the user retry.
+  - `403` — authenticated, but the user's group lacks the route's permission.
+- Login: wrong credentials or an inactive user → `401`; a DB failure → `503`.
+- Rotating `JWT_SECRET` invalidates every existing session once (everyone re-logs in).
 
 ## Bulk delete
 
