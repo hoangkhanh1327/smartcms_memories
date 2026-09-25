@@ -56,29 +56,46 @@ All API routes live under the prefix from the backend's `BASE_URL` env var, depl
 `appConfig.apiUrl` → `BaseService`'s `baseURL`; several *other* backends have their own
 `VITE_API_*_URL` and their own service module.
 
-## Authentication: token lifetime, renewal and error semantics
+## Authentication: tokens, renewal, refresh and error semantics
 
 Introduced 2026-09-25 by feature `005-jwt-auth-hardening` (API repo). **Breaking for both sides —
 deploy the API and the web panel together.**
 
-- The API signs JWTs with the `JWT_SECRET` env var (no hardcoded secret). Token lifetime is
-  `JWT_EXPIRES_IN` (default `1d`); the absolute session cap is `JWT_MAX_SESSION` (default `7d`),
-  counted from the `auth_time` claim set at login.
-- **Sliding renewal**: when an authenticated request carries a token past half its lifetime, and
-  the DB confirmed the user active within the last 60 s, the API returns a fresh token in the
-  **`x-refresh-token`** response header (exposed via CORS). The new token keeps the original
-  `auth_time`, and its `exp` never exceeds `auth_time + JWT_MAX_SESSION` — users re-login at least
-  every 7 days.
-- The frontend's `BaseService` replaces `auth.session.token` with that header's value on any
-  non-401 response. Only `api-smart-cms` issues it; the other `VITE_API_*` backends do not.
-- **Status codes**:
-  - `401` — the session is invalid (missing/bad/expired token, user deleted, or user
-    `status ≠ 1`). The frontend signs out.
-  - `503` — temporary infrastructure failure (e.g. the `DB_MEMBER` connection is lost). The
-    frontend must **not** sign out; show the message and let the user retry.
-  - `403` — authenticated, but the user's group lacks the route's permission.
-- Login: wrong credentials or an inactive user → `401`; a DB failure → `503`.
-- Rotating `JWT_SECRET` invalidates every existing session once (everyone re-logs in).
+**Two tokens.** Login (`POST {BASE_URL}/authen/login`) returns `access_token` and `refresh_token`
+in `data`. Both are JWTs signed with the `JWT_SECRET` env var (no hardcoded secret).
+- **Access token** — sent as `Authorization: Bearer`. Lifetime `JWT_EXPIRES_IN` (default `1d`).
+- **Refresh token** — claim `typ: "refresh"`, stateless (nothing stored server-side), expires at
+  `auth_time + JWT_MAX_SESSION` (default `7d`, counted from login). The API rejects it as a Bearer
+  token (401). The frontend keeps it in the redux-persist `auth.session.refreshToken`
+  (localStorage) — an accepted XSS trade-off, because CORS stays `origin: '*'` (internal system),
+  which rules out credentialed cookies.
+
+**Sliding renewal (before expiry).** When an authenticated request carries an access token past
+half its lifetime, and the DB confirmed the user active within the last 60 s, the API returns a
+fresh access token in the **`x-renewed-access-token`** response header (exposed via CORS). It is
+an *access* token, not a refresh token. It keeps the original `auth_time`, and its `exp` never
+exceeds `auth_time + JWT_MAX_SESSION`. The frontend's `BaseService` swaps it into
+`auth.session.token` on any non-401 response.
+
+**Refresh (after expiry).** `POST {BASE_URL}/authen/refresh` (public), body
+`{ "refresh_token": "..." }` → `data: { access_token }` (same `auth_time`, same cap). On a 401 from
+any API call, `BaseService` makes **one** shared refresh call for all concurrent 401s (15 s
+timeout), then retries each original request once. Refresh `401` → sign out. Refresh network
+error / `503` / timeout → keep the session and surface the error. Only `api-smart-cms` issues or
+accepts these tokens; the other `VITE_API_*` backends do not.
+
+**Status codes**:
+- `401` — the session is invalid (missing/bad/expired token, refresh token used as Bearer, user
+  deleted, or user `status ≠ 1`). The frontend refreshes if it can, otherwise signs out.
+- `503` — temporary infrastructure failure (e.g. the `DB_MEMBER` connection is lost). The frontend
+  must **not** sign out; show the message and let the user retry.
+- `403` — authenticated, but the user's group lacks the route's permission.
+
+Login: wrong credentials or an inactive user → `401`; a DB failure → `503`. Refresh: invalid,
+expired or wrong-type token, or a locked/deleted user → `401`; if the DB is unreachable the API
+fails open and still issues the access token. Sign-out is client-side only (it clears both
+tokens) — there is no logout endpoint, and a leaked refresh token stays valid until it expires
+unless the user is locked. Rotating `JWT_SECRET` invalidates every session once.
 
 ## Bulk delete
 
