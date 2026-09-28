@@ -109,3 +109,5 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
   an internal admin tool. Call it through the Postman collection
   `postman/permission-sync.postman_collection.json` (login → dry run → real write; collection
   variables `baseUrl`, `username`, `password`, `accessToken`; never commit real credentials into it).
+
+- Permission sync can be scoped: body `controllers?: string[]` (controller class names, 1–50). The scan still reads all metadata (in-memory, no DB), then keeps permissions declared by any listed controller, so shared `name`s still report `ambiguous` exactly like a full run. DB read narrows to rows whose `menu_key` is a scanned `name` or parent `menu_key`. Unknown controller ⇒ 400 before any DB access. Scoped runs return `orphans: null` (partial table read); report carries `controllers` (`null` = full run).
