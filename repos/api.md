@@ -4,7 +4,7 @@ tags:
   - repo
   - api
   - nestjs
-updated: '2026-09-25'
+updated: '2026-09-28'
 summary: >-
   Backend API for the CMS project. NestJS 10 + Fastify, multi-store. Large and
   inconsistent repo — new code follows ADR 0001, never copy the legacy patterns.
@@ -104,3 +104,8 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
     concurrent write. Guarded by its own permission `permission-sync.sync` under `menu-config`.
 - The old `GET /route` (`src/modules/routes/`, public, deleted every level-4 row) and
   `MenuConfigService.addMenuDynamic` / `deleteMenuDynamic` were removed.
+
+- **Not on Swagger** (2026-09-28): `PermissionSyncController` is `@ApiExcludeController()` — it is
+  an internal admin tool. Call it through the Postman collection
+  `postman/permission-sync.postman_collection.json` (login → dry run → real write; collection
+  variables `baseUrl`, `username`, `password`, `accessToken`; never commit real credentials into it).
