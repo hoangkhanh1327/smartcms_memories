@@ -13,7 +13,8 @@ links:
   - conventions.md
   - repos/api.md
   - architecture/decisions/0001-new-feature-module-conventions.md
-updated: '2026-09-04'
+  - architecture/decisions/0004-permission-model.md
+updated: '2026-09-29'
 ---
 # AI Dubbing — API contract
 
@@ -57,16 +58,25 @@ must start `api/v1/video-jobs`, **not** `video-jobs`.
 
 ## Auth & RBAC
 
-- Global `AuthGuard` (`APP_GUARD`), **JWT Bearer required on every route in this module** — the
-  AI-server callback route included (see Caveats).
-- RBAC route names via `@RouteInfo`. Menu keys / permission names the frontend menu must map:
+- Global `AuthGuard` (`APP_GUARD`), JWT Bearer required on every route except
+  `PATCH /language-tasks/callback`, which is `@Public()` (AI server → CMS, no `name`).
+- Permissions are **action-level** (since 2026-09-29, per
+  [ADR 0004](../architecture/decisions/0004-permission-model.md)). All four controllers declare
+  class `@RouteInfo({ menu_key: 'ai-dubbing' })` — the CMS page "Thuyết minh" (level 2,
+  `menu_link` `/ai/dubbing`) under the level-1 group `ai`. Names are locked by
+  `controllers/ai-dubbing-permissions.spec.ts`.
 
-| menu_key | route names |
+| Permission | Endpoints |
 |---|---|
-| `ai-dubbing-video-jobs` | `.list` `.create` `.detail` `.retry` `.language-tasks` `.final-outputs` `.create-final-output` |
-| `ai-dubbing-language-tasks` | `.list` `.detail` `.delete` `.approve` `.reject` `.retry` `.callback` |
-| `ai-dubbing-final-outputs` | `.list` `.detail` `.delete` |
-| `ai-dubbing-job-step-logs` | `.list` |
+| `ai-dubbing.view` | `GET /video-jobs`, `/video-jobs/:id`, `/video-jobs/:id/language-tasks`, `/video-jobs/:id/final-outputs`, `GET /language-tasks`, `/language-tasks/:id`, `GET /final-outputs`, `/final-outputs/:id`, `GET /job-step-logs` |
+| `ai-dubbing.create` | `POST /video-jobs`, `POST /video-jobs/:id/language-tasks`, `POST /language-tasks/:id/approve`, `/reject` (creator and reviewer are the same role) |
+| `ai-dubbing.retry` | `POST /video-jobs/:id/retry`, `POST /language-tasks/:id/retry` |
+| `ai-dubbing.publish` | `POST /video-jobs/:id/final-outputs` |
+| `ai-dubbing.delete` | `DELETE /video-jobs` (bulk), `DELETE /language-tasks/:id`, `DELETE /final-outputs/:id` |
+
+To see the menu a group needs `ai`, `ai-dubbing` and at least `ai-dubbing.view`. The screen also
+calls shared lookups with no permission name (`configs/vod-common/tpw-menus/get-content-type-options`,
+`.../search-content`, `content/movie-partition/:id`); do not gate them with another screen's key.
 
 ## Endpoints
 
@@ -133,7 +143,7 @@ free a slot" on that error.
 | POST | `/:id/approve` | — | updated `LanguageTask` | 200 — only from `PREVIEW_READY` |
 | POST | `/:id/reject` | `{reason?}` ≤500 | updated `LanguageTask` | 200 — only from `PREVIEW_READY` |
 | POST | `/:id/retry` | — | `null` | **202** — only from `FAILED` |
-| POST | `/callback` | `UpdateAudioAIDto` | `null` | 200 — **AI server → CMS, not for the UI** |
+| PATCH | `/callback` | `UpdateAudioAIDto` | `null` | 200 — **AI server → CMS, not for the UI** |
 
 `reject`'s `reason` is stored in the task's `errorMessage` column and also written to a
 `reject-preview` job step log.
@@ -251,9 +261,8 @@ rather than retrying the mutation.
 4. **204 responses carry a body.** `TransformInterceptor` sets the HTTP status from the envelope,
    so the three delete/`NO_CONTENT` endpoints emit 204 *with* an envelope. Fastify may drop that
    body — treat 204 as success without parsing.
-5. **`POST /language-tasks/callback` sits behind the global `AuthGuard`** with no `@Public()`. It
-   is the AI server's callback URL, so either the partner sends a JWT or this route 401s in
-   practice. Not a frontend concern, but it explains dubbing runs stuck at `AI_TRANSLATING`.
+5. **`PATCH /language-tasks/callback` is `@Public()`** (no JWT, no permission check) — it is the
+   AI server's callback URL. It is not for the UI.
 6. **No polling endpoint and no websocket.** Progress arrives via BullMQ/Redis into the DB; the UI
    must **poll** `GET /video-jobs/:id` + the nested task list while any status is non-terminal.
 7. **No upload endpoint here.** `metaData.path` / `subtitlePath` are paths on FTP A that must
