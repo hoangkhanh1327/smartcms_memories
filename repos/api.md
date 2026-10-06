@@ -4,7 +4,6 @@ tags:
   - repo
   - api
   - nestjs
-updated: '2026-10-06'
 summary: >-
   Backend API for the CMS project. NestJS 10 + Fastify, multi-store. Large and
   inconsistent repo — new code follows ADR 0001, never copy the legacy patterns.
@@ -14,6 +13,7 @@ links:
   - contracts/ai-dubbing.md
   - contracts/content-edit.md
   - contracts/content-media-upload.md
+updated: '2026-10-06'
 ---
 # `api-smart-cms` — API-side
 
@@ -50,6 +50,11 @@ from whichever file you open first.
   tagged `[legacy-only]` where ADR 0001 overrides it.
 - A `PreToolUse` hook (`.claude/hooks/memory-commit-reminder.sh`, wired in `.claude/settings.json`)
   reminds the agent to update this memory when new module files are staged for commit.
+- **Type-checking a few files** without a full `tsc`: ts-jest type-checks every file a spec
+  imports, so a throwaway spec that `await import()`s the touched files (with
+  `jest.mock('@/config/config', ...)`) reports their TS errors. Run jest per directory with
+  `--runInBand`, never the whole suite. `nest start --watch` only restarts the server when the
+  compile has no errors — a rebuilt `dist/` with an old process start time means a type error.
 
 ## Known issues
 
@@ -62,10 +67,15 @@ from whichever file you open first.
 2. `AllExceptionFilter` sets `error: exception` (serialises the raw exception to the client) and,
    for a plain `Error`, puts `exception.stack` into the client-visible `message` with a 500. This
    is why new services must throw `HttpException` subclasses.
+3. Legacy content services return `Error` objects instead of throwing in many places, so callers'
+   `if (!x)` checks never fire: VOD `ContentService.getContent`, Music `getDetailMusicVideo`
+   (always returns an object) as used by `thirdparty/services/sync-content`; and
+   `movie-trailer.controler.ts` compares an un-awaited `getDetails` Promise to null.
+4. The redis-api `security_code` is hardcoded in source (moving it to env is a separate feature).
 
 **Resolved 2026-09-03:**
 
-3. ~~Referral module carried an unwired Excel-export path plus unused transaction-count helpers.~~
+5. ~~Referral module carried an unwired Excel-export path plus unused transaction-count helpers.~~
    Removed: `ExportReferralCampaignDto`, `findForExport`, `getStatusCounts`,
    `countDistinctReferees`, `calculateConversionRate`, and dead `fs` / `renderExportExcelBorder`
    imports — along with the 9 tests that covered them (17 → 8 tests, all passing; typecheck clean).
@@ -77,6 +87,8 @@ from whichever file you open first.
 | Module | Path in repo | Contract |
 |---|---|---|
 | **AI Dubbing** — AI voice-over / dubbing pipeline (video job → language task → preview review → multi-audio final output) | `src/modules/content/ai_dubling/` (folder spelled without the second `b`) | [`contracts/ai-dubbing.md`](../contracts/ai-dubbing.md) |
+| **Content edit** — VOD / Movie / Music Video detail, create, PATCH, trailer/series sub-tables | `src/modules/content/{vod,movie,music-video}/edit/`, `content-edit-shared/` | [`contracts/content-edit.md`](../contracts/content-edit.md) |
+| **Content media upload** — signed per-slot image upload to CDN | `src/modules/content/content-media-upload/` | [`contracts/content-media-upload.md`](../contracts/content-media-upload.md) |
 
 Read the contract before building or changing the frontend screens for one of these — it records
 the request/response shapes, the status machines and the known dead filters, which the controllers
@@ -106,6 +118,8 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
     concurrent write. Guarded by its own permission `permission-sync.sync` under `menu-config`.
 - The old `GET /route` (`src/modules/routes/`, public, deleted every level-4 row) and
   `MenuConfigService.addMenuDynamic` / `deleteMenuDynamic` were removed.
+- `@RouteInfo.path` feeds the permission row's `api_link` — keep legacy path strings when a
+  handler moves to a new controller, or permission-sync will rewrite existing rows.
 
 - **Not on Swagger** (2026-09-28): `PermissionSyncController` is `@ApiExcludeController()` — it is
   an internal admin tool. Call it through the Postman collection
@@ -114,9 +128,22 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
 
 - Permission sync can be scoped: body `controllers?: string[]` (controller class names, 1–50). The scan still reads all metadata (in-memory, no DB), then keeps permissions declared by any listed controller, so shared `name`s still report `ambiguous` exactly like a full run. DB read narrows to rows whose `menu_key` is a scanned `name` or parent `menu_key`. Unknown controller ⇒ 400 before any DB access. Scoped runs return `orphans: null` (partial table read); report carries `controllers` (`null` = full run).
 
-## Content edit standardisation (feature 008, in progress)
+## Content edit standardisation (feature 008)
 
 - Shared leaf `src/modules/content/content-edit-shared/`: field catalogue, `ContentEditBodyPipe`,
-  `ContentKindMapper`, envelope interceptor — see `contracts/content-edit.md`.
+  `ContentKindMapper`, `ContentEditResponseInterceptor`, timeouts, and the sub-table contracts
+  (`trailer-contract.ts`, `series-contract.ts`) — see `contracts/content-edit.md`.
 - Leaf `src/modules/content/content-media-upload/`: signed direct-to-CDN uploads — see
   `contracts/content-media-upload.md`.
+- Per kind, identical layout `{vod,movie,music-video}/edit/`: `<kind>-edit.mapper.ts`,
+  `services/<kind>-edit.service.ts` (detail/create/update), `services/<kind>-edit-side-effects.service.ts`
+  (cate list, actors, keyword, auto-tags via the legacy `syncAutoTags`, popular, Redis, audit),
+  `controllers/{<kind>-edit, <kind>-trailers, <kind>-series}.controller.ts`.
+- Legacy `ContentService` / `MovieService` / `MusicVideoService` still serve lists, status,
+  publish, sync and other immediate actions; their old create/update/detail handlers were removed.
+  `channel.service` (live → VOD) still re-saves a VOD through `ContentService.createContent` —
+  moving it to the PATCH service is a separate feature.
+- The `'IContentService'` (VOD) and `'IMusicVideoService'` string tokens and their interface files
+  are gone; inject the classes (`@Inject(forwardRef(() => ContentService))` where the module import
+  is already `forwardRef`). `config-webapp` has its own unrelated `'IContentService'` (landing page).
+- Legacy conventions kept: VOD and Movie store an inactive episode as `-1` (Music uses `0`).
