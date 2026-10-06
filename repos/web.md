@@ -5,7 +5,7 @@ tags:
   - frontend
   - react
   - mantine
-updated: '2026-09-04'
+updated: '2026-10-06'
 summary: >-
   SmartCMS Admin — the CMS web panel. React 18 + Vite SPA, Redux Toolkit + RTK
   Query, Mantine 7 for new UI over a large Kendo React legacy. Consumes
@@ -15,6 +15,8 @@ links:
   - architecture/decisions/0002-frontend-mantine-design-system.md
   - conventions.md
   - architecture/decisions/0003-frontend-shared-tables-tanstack.md
+  - contracts/content-edit.md
+  - contracts/content-media-upload.md
 ---
 # `smartcms` web — Frontend
 
@@ -178,3 +180,9 @@ moves.
 So the "Also present: `@tanstack/react-table` + `react-virtual`" line in the Stack section above is
 no longer incidental — it is the table stack. `src/modules/configs/referral` already imports from
 `@/components/shared/tables`; copy it rather than an older list screen.
+
+## Content edit standardisation (feature 008, in progress)
+
+VOD / Movie / Music Clip create+edit pages move onto `src/components/shared/contentEdit/` and the
+neutral JSON contract (`contracts/content-edit.md`); images upload per slot via
+`contracts/content-media-upload.md` and are sent with `MEDIA_TOKENS`.
