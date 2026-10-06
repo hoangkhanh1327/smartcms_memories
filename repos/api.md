@@ -4,7 +4,7 @@ tags:
   - repo
   - api
   - nestjs
-updated: '2026-09-28'
+updated: '2026-10-06'
 summary: >-
   Backend API for the CMS project. NestJS 10 + Fastify, multi-store. Large and
   inconsistent repo — new code follows ADR 0001, never copy the legacy patterns.
@@ -12,6 +12,8 @@ status: ready
 links:
   - architecture/decisions/0001-new-feature-module-conventions.md
   - contracts/ai-dubbing.md
+  - contracts/content-edit.md
+  - contracts/content-media-upload.md
 ---
 # `api-smart-cms` — API-side
 
@@ -111,3 +113,10 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
   variables `baseUrl`, `username`, `password`, `accessToken`; never commit real credentials into it).
 
 - Permission sync can be scoped: body `controllers?: string[]` (controller class names, 1–50). The scan still reads all metadata (in-memory, no DB), then keeps permissions declared by any listed controller, so shared `name`s still report `ambiguous` exactly like a full run. DB read narrows to rows whose `menu_key` is a scanned `name` or parent `menu_key`. Unknown controller ⇒ 400 before any DB access. Scoped runs return `orphans: null` (partial table read); report carries `controllers` (`null` = full run).
+
+## Content edit standardisation (feature 008, in progress)
+
+- Shared leaf `src/modules/content/content-edit-shared/`: field catalogue, `ContentEditBodyPipe`,
+  `ContentKindMapper`, envelope interceptor — see `contracts/content-edit.md`.
+- Leaf `src/modules/content/content-media-upload/`: signed direct-to-CDN uploads — see
+  `contracts/content-media-upload.md`.
