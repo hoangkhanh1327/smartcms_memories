@@ -10,14 +10,15 @@ summary: >-
   Per-slot image upload for VOD/Movie/Music Video forms; server validates,
   resizes variants, pushes to CDN, returns paths + HMAC token used in
   MEDIA_TOKENS on save.
-status: draft
+status: ready
 links:
   - contracts/content-edit.md
 updated: '2026-10-06'
 ---
-# Content media upload — feature 008 (draft)
+# Content media upload — feature 008
 
-Code: `api: src/modules/content/content-media-upload/`.
+Code: `api: src/modules/content/content-media-upload/`; web client
+`src/components/shared/contentEdit/mediaUpload.ts` + `ImageSlotField`.
 
 ## Endpoints
 
@@ -26,7 +27,8 @@ Code: `api: src/modules/content/content-media-upload/`.
 `TYPE_ID` (Movie type 21 shuffle sizes). Each route reuses the kind's existing permission
 (`vod-index.create/update`, `movies-index.*`, `music-clip-index.*`) under that kind's menu.
 
-Response `data`: `{ fields: { <neutral field>: <CDN path>, ... }, token }`.
+Response (`ContentEditResponseInterceptor` envelope) `data`: `{ fields: { <neutral field>: <CDN
+path>, ... }, token }`.
 
 ## Behaviour
 
