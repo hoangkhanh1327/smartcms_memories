@@ -5,7 +5,6 @@ tags:
   - frontend
   - react
   - mantine
-updated: '2026-10-06'
 summary: >-
   SmartCMS Admin — the CMS web panel. React 18 + Vite SPA, Redux Toolkit + RTK
   Query, Mantine 7 for new UI over a large Kendo React legacy. Consumes
@@ -17,6 +16,7 @@ links:
   - architecture/decisions/0003-frontend-shared-tables-tanstack.md
   - contracts/content-edit.md
   - contracts/content-media-upload.md
+updated: '2026-10-06'
 ---
 # `smartcms` web — Frontend
 
@@ -47,6 +47,9 @@ Vietnamese even though code identifiers are English.
 - Forms: `@mantine/form` + `mantine-form-yup-resolver` (new) / **Formik** + Yup (legacy).
 - Also present: Bitmovin player + hls.js/video.js, ApexCharts + Recharts, `@dnd-kit`,
   `@tanstack/react-table` + `react-virtual`, exceljs/xlsx export, TinyMCE + Quill + TipTap.
+- Tests: **vitest 0.34** (pure functions only, `npm run test:unit`, run one file at a time) and
+  **Playwright** e2e (`npm run test:e2e`, config `e2e/playwright.config.ts`). Both added by
+  feature 008.
 
 ## Repo layout
 
@@ -60,6 +63,7 @@ src/
   components/{shared,ui,custom,common,layouts,route,template,player}
   configs/                      # app.config, mantine.theme, routes.config/, navigation.config/
   @types/  constants/  utils/  assets/
+e2e/                            # Playwright: tests/, support/, playwright.config.ts
 ```
 
 **Per-module internal layout** (uniform across modules):
@@ -118,7 +122,7 @@ Other API-layer facts:
   `.env.*` files. Output goes to `build/`, served by `pm2 serve ./build <port> --spa`.
 - GitLab CI (`.gitlab-ci.yml`) has a single `deploy` stage, one job per branch
   (`stage`, `stage_v2`, `hotfix/*`), each running a script in `bash/`. **No test or lint job runs
-  in CI** — there is no test suite in this repo.
+  in CI** — the vitest / Playwright suites are local-only.
 
 ## Traps on this machine — read before running anything
 
@@ -135,17 +139,18 @@ Other API-layer facts:
 
    Add `--noUnusedLocals --noUnusedParameters` (neither is on in the repo config) to catch dead
    imports. The `grep -v` matters: `@mantine/core`'s `.d.ts` files always produce parse errors under
-   TypeScript 4.9.5 and are not yours.
+   TypeScript 4.9.5 and are not yours. A separate TypeScript 5 install (outside the repo) checking
+   single files gives real Mantine prop types.
 2. **That parse failure means Mantine props degrade to `any`** — a scoped tsc run passes even with
    an invented prop. It verifies *your* code's types, never Mantine prop correctness. Check those
    against `node_modules/@mantine/*/lib/**/*.d.ts`, and **do not** use `mantine_llm.txt`: despite
    what the repo's own rules and the prompt hook say, it is only a list of doc URLs. See ADR 0002.
 3. **`npx eslint` fails immediately** — `.eslintrc.cjs` references `eslint-plugin-prettier`, which
    is not installed.
-4. The Vite **dev server** runs fine (~1 s startup): `npx vite --port <n> --strictPort`. A headless
-   Chromium exists at `~/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome` (no playwright
-   package installed — drive it over CDP with Node 22's native `WebSocket`) if a change really needs
-   visual confirmation.
+4. The Vite **dev server** runs fine (~1 s startup): `npx vite --port <n> --strictPort`. Playwright
+   e2e runs against the local dev server + local API; credentials live in `e2e/.env.local`
+   (never commit or print them). Content edit specs intercept every write with `page.route`, so
+   only reads hit the backend.
 5. `jq` is not installed on this machine (same as the API repo). Use `node` or `/usr/bin/python3`.
 
 ## In-repo agent framework
@@ -181,8 +186,24 @@ So the "Also present: `@tanstack/react-table` + `react-virtual`" line in the Sta
 no longer incidental — it is the table stack. `src/modules/configs/referral` already imports from
 `@/components/shared/tables`; copy it rather than an older list screen.
 
-## Content edit standardisation (feature 008, in progress)
+## Content edit pages — shared frame (feature 008)
 
-VOD / Movie / Music Clip create+edit pages move onto `src/components/shared/contentEdit/` and the
+VOD / Movie / Music Clip create+edit pages use `src/components/shared/contentEdit/` and the
 neutral JSON contract (`contracts/content-edit.md`); images upload per slot via
 `contracts/content-media-upload.md` and are sent with `MEDIA_TOKENS`.
+
+- Frame: `ContentEditLayout` (SectionNav + two columns + sticky `ClassificationPanel` with
+  `CateCheckboxTree` / `ServiceCateTreeSelect` / `HiddenDeviceTreeSelect`), `EditFooter` (dirty
+  state, "Thao tác khác" menu), `useLeaveGuard`, `ImageSlotField`, `DescriptionFields`.
+- Shared sections: `MediaSection` (VOD/Movie), `BusinessSection`, `ContentTags`, `QualityField`;
+  sub-tables `TrailerSection` (RTK Query `trailerQueries`, routes `content/trailers/{kind}`),
+  `subTables.ts`, `subTables/BestcutForm.tsx`. Series services call `content/series/{kind}`.
+- Form ↔ contract: `formValues.ts` (`toFormValues`, `buildSubmitBody`, `toContractDate`,
+  `toPickerDate`) + `diffValues` — PATCH sends only changed fields, cleared fields as `null`.
+- Per module (identical layout): `<Module>/Info/components/form/<X>Form.tsx`, `sections/*`,
+  `<x>FormValues.ts` (+ `.test.ts`); views `add` / `edit`. Movie/VOD short forms share
+  `ShortV2/Info/components/Form/ContentShortForm`.
+- `DescriptionEditor` (Quill) emits changes only when `source === 'user'`, otherwise the form is
+  dirty on open. Yup fields that may be `null` from the API need `.nullable()`.
+- E2E: `e2e/support/contentEdit.ts` `defineContentEditSuite(test, config)` drives
+  `e2e/tests/{vod,movie,music-clip}-edit-form.spec.ts`.
