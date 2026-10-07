@@ -83,6 +83,17 @@ expanded with their parents. Auto-tags re-run when a trigger field is patched (o
 read before the transaction); Redis write is unconditional. Audit log (before/after per patched
 column) is written before the response.
 
+**`TOURNAMENT_CATE_LIST` (VOD + Movie)** — tournament / Anime tree links in `TOURNAMENT_CATE_LIST`.
+Tree type comes from `TYPE_ID` (`CATE_TYPE_CONTENT_BY_TYPE_ID` in `src/constant/tournament.const.ts`:
+12, 78 → tournament; 6, 2, 20, 22, 25 → Anime; others → no tree, field ignored). The form gets the
+tree from `GET /lookup/cate-tree?TYPE_ID=`. Cate of the wrong type → 422; synced after commit.
+`CONTENT_ID` in that table holds both VOD `CONTENT_ID` and `MOVIE_ID` (overlapping ranges), so every
+read/write by content id also filters `TYPE_ID IN` the source table's group (`resolveCateLinkTypeIds`:
+movie = 2, 20, 22, 25; VOD = the rest). The unique key must include `TYPE_ID`
+(`uq_tcl_cate_content_type`, DDL written 2026-10-07; the old `(CATE_ID, CONTENT_ID)` key silently
+drops a movie link that collides with a VOD link). Anime "linked content" (`GET
+content/anime-cate/vods/:id`) unions VOD and movies; rows carry `SOURCE: 'VOD' | 'MOVIE'`.
+
 ## Sub-tables — standard routes (added next to the legacy ones, which stay)
 
 `{kind}` = `vod` | `movie` | `music-video`. Reads need `<menu>.detail`, writes `<menu>.update`
