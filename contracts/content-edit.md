@@ -13,13 +13,13 @@ status: ready
 links:
   - architecture/decisions/0001-new-feature-module-conventions.md
   - contracts/content-media-upload.md
-updated: '2026-10-06'
+updated: '2026-10-07'
 ---
 # Content edit contract — feature 008
 
-Source of truth in code: `api: src/modules/content/content-edit-shared/content-edit-fields.ts`
-(field catalogue) and `{vod,movie,music-video}/edit/`. Mirrored by
-`web: src/components/shared/contentEdit/` (`types.ts`, `formValues.ts`, `diffValues`).
+Source of truth in code: `api: src/modules/content/content-edit/shared/content-edit-fields.ts`
+(field catalogue) and the leaves `content-edit/{vod,movie,music-video}-edit{,-trailers,-series}/`.
+Mirrored by `web: src/components/shared/contentEdit/` (`types.ts`, `formValues.ts`, `diffValues`).
 
 ## Kinds and endpoints (paths unchanged, permissions unchanged)
 
@@ -34,7 +34,7 @@ Source of truth in code: `api: src/modules/content/content-edit-shared/content-e
 Music `/:musicId`) because permission-sync builds `api_link` from them.
 
 VOD and Movie keep `PUT` on the update path returning 409 "Trang đã có phiên bản mới, vui lòng tải
-lại trang" (stale bundles); removed after 1–2 releases (feature 008 T50).
+lại trang" (stale bundles); removal is a post-release follow-up (plan v3.8).
 
 ## Response
 
@@ -59,7 +59,8 @@ filtered by the content's own `TYPE_ID`.
 - Dates: `YYYY-MM-DD HH:mm:ss`.
 - Read-only in detail: `ID`, `KEYWORD` (server-derived from name), `TAG_IDS` (tags keep their own
   immediate API), `CATEGORY_NAME`, `PENDING_STATUS`, `ACTOR_NAMES`, VOD root fields,
-  `CONTENT_MOVIE` (server-derived).
+  `CONTENT_MOVIE` (server-derived), `CONTENT_COLLECTION` (owned by the Collection module; it
+  gates the hidden-device rule).
 - Shuffle posters (`POSTER_SHUFFLE_VER/HOR`): array of paths per slot (`null` = empty slot). Movie
   stores positionally (3 slots), VOD compacted.
 - Intro/outro and "apply to all episodes" are not part of the edit page (plan v3.4/v3.5).
@@ -67,22 +68,25 @@ filtered by the content's own `TYPE_ID`.
 ## Images
 
 See `contracts/content-media-upload.md`. Every new image path in a body must be covered by a token
-in the transient field `MEDIA_TOKENS`; unchanged / `null` images need none.
+in the transient field `MEDIA_TOKENS`; unchanged / `null` images need none. Values the client
+sends always win over a token's fields.
 
 ## Update semantics
 
 Server loads the current row, applies the patch, and computes every branch / derived value from
-the merged row; only patched columns are written; link tables (categories, actors) are rewritten
-only when their field is present (batched insert in the transaction). Movie categories are
-validated (400) and expanded with their parents. Auto-tags re-run when a trigger field is
-patched; Redis write is unconditional. Audit log (before/after per patched column) is written
-before the response.
+the merged row; only patched columns are written. Link tables are rewritten only when their field
+is present, inside the save transaction with batched inserts: categories, and actor links plus the
+actor-name column (`CONTENT_ACTOR` / `MOVIE_ACTOR`). Movie categories are validated (400) and
+expanded with their parents. Auto-tags re-run when a trigger field is patched (old actor list is
+read before the transaction); Redis write is unconditional. Audit log (before/after per patched
+column) is written before the response.
 
 ## Sub-tables — standard routes (added next to the legacy ones, which stay)
 
 `{kind}` = `vod` | `movie` | `music-video`. Reads need `<menu>.detail`, writes `<menu>.update`
 (`vod-index`, `movies-index`, `music-clip-index`). Legacy sub-table routes had no permission and
-are still used by ShortV2 etc.
+are still used by ShortV2 etc. Controllers are thin delegates; the leaf services translate legacy
+`Error` / `{ message, status }` results into `HttpException`.
 
 Trailers — `content/trailers/{kind}`:
 - `GET /:parentId` → the single trailer or `null`.
