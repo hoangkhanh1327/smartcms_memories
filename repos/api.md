@@ -48,7 +48,9 @@ from whichever file you open first.
   The owner's folder references are `src/modules/config/referral` and
   `src/modules/config/gamification`: parent `<feature>.module.ts` only aggregates, one leaf per
   resource with its own module, `shared/` for cross-leaf code.
-- **Existing module** → keep its local style. Do not migrate legacy code to ADR 0001.
+- **Existing module** → keep its local style. Do not migrate legacy code to ADR 0001 on your own;
+  the owner asked for it once — feature 009 re-shaped `content/{music-video,movie,vod}` into ADR
+  0001 leaves (pure move, legacy `IXxx` tokens kept; see the section below).
 - `.ai/core/*.md` in the repo documents the **legacy** conventions (`provenance: inferred`) and is
   tagged `[legacy-only]` where ADR 0001 overrides it.
 - A `PreToolUse` hook (`.claude/hooks/memory-commit-reminder.sh`, wired in `.claude/settings.json`)
@@ -75,7 +77,8 @@ from whichever file you open first.
 3. Legacy content services return `Error` objects instead of throwing in many places, so callers'
    `if (!x)` checks never fire: VOD `ContentService.getContent`, Music `getDetailMusicVideo`
    (always returns an object) as used by `thirdparty/services/sync-content`; and
-   `movie-trailer.controler.ts` compares an un-awaited `getDetails` Promise to null.
+   `movie/movie-trailer/controllers/movie-trailer.controller.ts` (renamed from `.controler.ts` in
+   feature 009) compares an un-awaited `getDetails` Promise to null.
 4. The redis-api `security_code` is hardcoded in source (moving it to env is a separate feature).
 
 **Resolved 2026-09-03:**
@@ -92,8 +95,8 @@ from whichever file you open first.
 | Module | Path in repo | Contract |
 |---|---|---|
 | **AI Dubbing** — AI voice-over / dubbing pipeline (video job → language task → preview review → multi-audio final output) | `src/modules/content/ai_dubling/` (folder spelled without the second `b`) | [`contracts/ai-dubbing.md`](../contracts/ai-dubbing.md) |
-| **Content edit** — VOD / Movie / Music Video detail, create, PATCH, trailer/series sub-tables | `src/modules/content/content-edit/` | [`contracts/content-edit.md`](../contracts/content-edit.md) |
-| **Content media upload** — signed per-slot image upload to CDN | `src/modules/content/content-edit/media-upload/` | [`contracts/content-media-upload.md`](../contracts/content-media-upload.md) |
+| **Content edit** — VOD / Movie / Music Video detail, create, PATCH, trailer/series sub-tables | `src/modules/content/{vod,movie,music-video}/` leaves + `src/modules/content/shared/content-edit/` | [`contracts/content-edit.md`](../contracts/content-edit.md) |
+| **Content media upload** — signed per-slot image upload to CDN | `src/modules/content/shared/media-upload/` | [`contracts/content-media-upload.md`](../contracts/content-media-upload.md) |
 
 Read the contract before building or changing the frontend screens for one of these — it records
 the request/response shapes, the status machines and the known dead filters, which the controllers
@@ -133,28 +136,39 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
 
 - Permission sync can be scoped: body `controllers?: string[]` (controller class names, 1–50). The scan still reads all metadata (in-memory, no DB), then keeps permissions declared by any listed controller, so shared `name`s still report `ambiguous` exactly like a full run. DB read narrows to rows whose `menu_key` is a scanned `name` or parent `menu_key`. Unknown controller ⇒ 400 before any DB access. Scoped runs return `orphans: null` (partial table read); report carries `controllers` (`null` = full run).
 
-## Content edit standardisation (feature 008)
+## Content modules: VOD / Movie / Music Video (features 008 + 009)
 
-Layout `src/modules/content/content-edit/` (ADR 0001, owner-approved 2026-10-07, plan v3.10):
+Since feature 009 (2026-10-07) each kind is an ADR 0001 aggregator over per-resource leaves; the
+feature-008 edit code lives inside them and `content/content-edit/` no longer exists:
 
 ```
-content-edit.module.ts          # aggregator only (imported by app.module)
-shared/                         # pure helpers, no providers: field catalogue, ContentEditBodyPipe,
-                                # mapper, ContentEditResponseInterceptor, timeouts, actor-links,
-                                # trailer/series contracts, dto/, route-table.testing.ts (spec helper)
-media-upload/                   # MediaUploadModule: controller (3 classes, one file) + service
-<kind>-edit/                    # kind = vod | movie | music-video: controller + mapper flat,
-  services/                     #   <kind>-edit.service.ts + <kind>-edit-side-effects.service.ts
-<kind>-edit-trailers/           # content/trailers/<kind>: controller + service flat
-<kind>-edit-series/             # content/series/<kind>: controller + service flat
+content/<kind>/                       # kind = vod | movie | music-video
+  <kind>.module.ts                    # aggregator: imports + exports the leaves only; keeps the old
+                                      # class name (VodModule / MovieModule / MusicVideoModule)
+  <kind>.module.spec.ts               # asserts the aggregator / leaf shape from module metadata
+  <kind>/                             # main resource, module class <Kind>CoreModule: legacy controller
+                                      # + 008 edit controller, services/, <kind>-edit.mapper.ts, dto/
+  <kind>-cate/  <kind>-series/  <kind>-trailer/   # legacy + 008 standard routes per resource
+  <kind>-subtitle-ai/                 # vod and movie only
+  shared/                             # <Kind>SharedModule: all TypeORM entities + the kind's
+                                      # repositories (+ providers several leaves need), shared dto/
+content/shared/media-upload/          # MediaUploadModule (imported by app.module)
+content/shared/content-edit/          # pure 008 helpers: field catalogue, body pipe, mapper,
+                                      # interceptor, timeouts, actor-links, contracts, dto/
 ```
 
-- Leaves import the legacy `VodModule` / `MovieModule` / `MusicVideoModule` (and Common,
-  ConfigCommon, Services, DeviceLevel, PublishContentJob, Channel) via `forwardRef`; the legacy
-  modules register no edit code and export the extra string tokens the leaves inject
-  (`'IContentTrailerRepository'`, `'IMusicVideoTrailerRepository'`, …). The leaves still inject
-  those legacy tokens — the repositories live in legacy modules.
-- Side effects compute on the merged row; cate list and actor links (+ `CONTENT_ACTOR` /
+- Pure move: routes, permission names, `IXxx` string tokens and service internals are unchanged
+  (route table + per-handler `RouteInfo` names diffed identical before/after). VOD files keep
+  their `content*` names.
+- DI rules used: `<Kind>SharedModule` is the first import of every leaf so its tokens win like the
+  old module-local providers did; a cross-module provider the old module declared locally sits in
+  the leaf that uses it, or in `shared` when several leaves use it; external module imports keep
+  the old order. The main leaf also declares the cross-module tokens the old module exported
+  (tag, actor, bestcut, crontab, tpw, banner, tournament …), so outside importers of
+  `VodModule` / `MovieModule` / `MusicVideoModule` still see them.
+- Cycles: `MovieService` ↔ `MovieSeriesService` (`forwardRef` on both leaves). VOD core → series
+  and music-video core → series are one-way.
+- Side effects (008) compute on the merged row; cate list and actor links (+ `CONTENT_ACTOR` /
   `MOVIE_ACTOR`) are written inside the save transaction; auto-tags reuse the legacy
   `syncAutoTags`. Trailer/series controllers are thin delegates; their services translate legacy
   `Error`/object results into `HttpException`.
