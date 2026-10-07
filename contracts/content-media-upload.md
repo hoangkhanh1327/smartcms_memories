@@ -17,8 +17,8 @@ updated: '2026-10-07'
 ---
 # Content media upload — feature 008
 
-Code: `api: src/modules/content/content-edit/media-upload/` (`MediaUploadModule`, leaf of
-`ContentEditModule`); web client `src/components/shared/contentEdit/mediaUpload.ts` +
+Code: `api: src/modules/content/shared/media-upload/` (`MediaUploadModule`, imported directly by
+`app.module` since feature 009); web client `src/components/shared/contentEdit/mediaUpload.ts` +
 `ImageSlotField`.
 
 ## Endpoints
