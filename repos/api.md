@@ -13,7 +13,7 @@ links:
   - contracts/ai-dubbing.md
   - contracts/content-edit.md
   - contracts/content-media-upload.md
-updated: '2026-10-06'
+updated: '2026-10-07'
 ---
 # `api-smart-cms` — API-side
 
@@ -45,6 +45,9 @@ from whichever file you open first.
 - **New feature module** → follow
   [`architecture/decisions/0001-new-feature-module-conventions.md`](../architecture/decisions/0001-new-feature-module-conventions.md).
   No base repository, no base service, no `IXxx` interfaces or DI tokens, no `BaseController`.
+  The owner's folder references are `src/modules/config/referral` and
+  `src/modules/config/gamification`: parent `<feature>.module.ts` only aggregates, one leaf per
+  resource with its own module, `shared/` for cross-leaf code.
 - **Existing module** → keep its local style. Do not migrate legacy code to ADR 0001.
 - `.ai/core/*.md` in the repo documents the **legacy** conventions (`provenance: inferred`) and is
   tagged `[legacy-only]` where ADR 0001 overrides it.
@@ -55,6 +58,8 @@ from whichever file you open first.
   `jest.mock('@/config/config', ...)`) reports their TS errors. Run jest per directory with
   `--runInBand`, never the whole suite. `nest start --watch` only restarts the server when the
   compile has no errors — a rebuilt `dist/` with an old process start time means a type error.
+- Local API needs the VPN to the staging DB / Redis / Mongo; without it `nest start` compiles but
+  hangs retrying connections (`ETIMEDOUT`).
 
 ## Known issues
 
@@ -87,8 +92,8 @@ from whichever file you open first.
 | Module | Path in repo | Contract |
 |---|---|---|
 | **AI Dubbing** — AI voice-over / dubbing pipeline (video job → language task → preview review → multi-audio final output) | `src/modules/content/ai_dubling/` (folder spelled without the second `b`) | [`contracts/ai-dubbing.md`](../contracts/ai-dubbing.md) |
-| **Content edit** — VOD / Movie / Music Video detail, create, PATCH, trailer/series sub-tables | `src/modules/content/{vod,movie,music-video}/edit/`, `content-edit-shared/` | [`contracts/content-edit.md`](../contracts/content-edit.md) |
-| **Content media upload** — signed per-slot image upload to CDN | `src/modules/content/content-media-upload/` | [`contracts/content-media-upload.md`](../contracts/content-media-upload.md) |
+| **Content edit** — VOD / Movie / Music Video detail, create, PATCH, trailer/series sub-tables | `src/modules/content/content-edit/` | [`contracts/content-edit.md`](../contracts/content-edit.md) |
+| **Content media upload** — signed per-slot image upload to CDN | `src/modules/content/content-edit/media-upload/` | [`contracts/content-media-upload.md`](../contracts/content-media-upload.md) |
 
 Read the contract before building or changing the frontend screens for one of these — it records
 the request/response shapes, the status machines and the known dead filters, which the controllers
@@ -130,15 +135,29 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
 
 ## Content edit standardisation (feature 008)
 
-- Shared leaf `src/modules/content/content-edit-shared/`: field catalogue, `ContentEditBodyPipe`,
-  `ContentKindMapper`, `ContentEditResponseInterceptor`, timeouts, and the sub-table contracts
-  (`trailer-contract.ts`, `series-contract.ts`) — see `contracts/content-edit.md`.
-- Leaf `src/modules/content/content-media-upload/`: signed direct-to-CDN uploads — see
-  `contracts/content-media-upload.md`.
-- Per kind, identical layout `{vod,movie,music-video}/edit/`: `<kind>-edit.mapper.ts`,
-  `services/<kind>-edit.service.ts` (detail/create/update), `services/<kind>-edit-side-effects.service.ts`
-  (cate list, actors, keyword, auto-tags via the legacy `syncAutoTags`, popular, Redis, audit),
-  `controllers/{<kind>-edit, <kind>-trailers, <kind>-series}.controller.ts`.
+Layout `src/modules/content/content-edit/` (ADR 0001, owner-approved 2026-10-07, plan v3.10):
+
+```
+content-edit.module.ts          # aggregator only (imported by app.module)
+shared/                         # pure helpers, no providers: field catalogue, ContentEditBodyPipe,
+                                # mapper, ContentEditResponseInterceptor, timeouts, actor-links,
+                                # trailer/series contracts, dto/, route-table.testing.ts (spec helper)
+media-upload/                   # MediaUploadModule: controller (3 classes, one file) + service
+<kind>-edit/                    # kind = vod | movie | music-video: controller + mapper flat,
+  services/                     #   <kind>-edit.service.ts + <kind>-edit-side-effects.service.ts
+<kind>-edit-trailers/           # content/trailers/<kind>: controller + service flat
+<kind>-edit-series/             # content/series/<kind>: controller + service flat
+```
+
+- Leaves import the legacy `VodModule` / `MovieModule` / `MusicVideoModule` (and Common,
+  ConfigCommon, Services, DeviceLevel, PublishContentJob, Channel) via `forwardRef`; the legacy
+  modules register no edit code and export the extra string tokens the leaves inject
+  (`'IContentTrailerRepository'`, `'IMusicVideoTrailerRepository'`, …). The leaves still inject
+  those legacy tokens — the repositories live in legacy modules.
+- Side effects compute on the merged row; cate list and actor links (+ `CONTENT_ACTOR` /
+  `MOVIE_ACTOR`) are written inside the save transaction; auto-tags reuse the legacy
+  `syncAutoTags`. Trailer/series controllers are thin delegates; their services translate legacy
+  `Error`/object results into `HttpException`.
 - Legacy `ContentService` / `MovieService` / `MusicVideoService` still serve lists, status,
   publish, sync and other immediate actions; their old create/update/detail handlers were removed.
   `channel.service` (live → VOD) still re-saves a VOD through `ContentService.createContent` —
@@ -147,3 +166,5 @@ Added 2026-09-25 by feature `006-route-permission-sync`.
   are gone; inject the classes (`@Inject(forwardRef(() => ContentService))` where the module import
   is already `forwardRef`). `config-webapp` has its own unrelated `'IContentService'` (landing page).
 - Legacy conventions kept: VOD and Movie store an inactive episode as `-1` (Music uses `0`).
+- Media-upload HMAC key derivation still uses the label `content-media-upload` — do not rename it
+  (would invalidate tokens issued before a deploy).
