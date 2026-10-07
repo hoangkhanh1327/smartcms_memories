@@ -17,8 +17,10 @@ updated: '2026-10-07'
 ---
 # Content edit contract — feature 008
 
-Source of truth in code: `api: src/modules/content/content-edit/shared/content-edit-fields.ts`
-(field catalogue) and the leaves `content-edit/{vod,movie,music-video}-edit{,-trailers,-series}/`.
+Source of truth in code: `api: src/modules/content/shared/content-edit/content-edit-fields.ts`
+(field catalogue) and, per kind, the leaves of `content/{vod,movie,music-video}/` (feature 009):
+edit controller/services in `<kind>/<kind>/`, standard trailer routes in `<kind>/<kind>-trailer/`,
+standard series routes in `<kind>/<kind>-series/`.
 Mirrored by `web: src/components/shared/contentEdit/` (`types.ts`, `formValues.ts`, `diffValues`).
 
 ## Kinds and endpoints (paths unchanged, permissions unchanged)
