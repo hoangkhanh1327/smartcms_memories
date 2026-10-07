@@ -13,12 +13,13 @@ summary: >-
 status: ready
 links:
   - contracts/content-edit.md
-updated: '2026-10-06'
+updated: '2026-10-07'
 ---
 # Content media upload — feature 008
 
-Code: `api: src/modules/content/content-media-upload/`; web client
-`src/components/shared/contentEdit/mediaUpload.ts` + `ImageSlotField`.
+Code: `api: src/modules/content/content-edit/media-upload/` (`MediaUploadModule`, leaf of
+`ContentEditModule`); web client `src/components/shared/contentEdit/mediaUpload.ts` +
+`ImageSlotField`.
 
 ## Endpoints
 
@@ -33,13 +34,16 @@ path>, ... }, token }`.
 ## Behaviour
 
 - Slot rules (size / max bytes / png) come from the old VOD, Movie, Music controllers
-  (`content-media-upload-rules.ts`). Errors → 400 Vietnamese; CDN failure → 502.
+  (`media-upload-rules.ts`). Errors → 400 Vietnamese; CDN failure → 502.
 - Server-made variants are returned in `fields`: `HOR_POSTER_APP` → `HOR_POSTER` (890×500) for
   VOD/Movie; `BIGBANNER` → `VER_POSTER` (400×600), plus `VER_POSTER_APP` for VOD.
 - Files go straight to the CDN (no temp area, no DB rows — no DB permission, multi-instance API);
   images from cancelled edits stay on the CDN (accepted).
-- `token` = stateless HMAC (key derived from `JWT_SECRET`, 24h TTL) over `{kind, slot, fields,
-  userId}`. On save the client sends tokens in `MEDIA_TOKENS`; the server rejects new images
-  without a valid token of the same kind and user, and applies **all** fields of each used token.
+- `token` = stateless HMAC (key derived from `JWT_SECRET` with the fixed label
+  `content-media-upload`, 24h TTL) over `{kind, slot, fields, userId}`. On save the client sends
+  tokens in `MEDIA_TOKENS`; the server rejects new images without a valid token of the same kind
+  and user. A used token **fills only the fields the client did not send** (e.g. a variant);
+  any value the client sent — including `null` for a removed slot — wins (fixed 2026-10-07: a
+  freshly uploaded image removed before saving used to come back).
 - Every upload writes an audit log entry (`module: CONTENT_MEDIA_UPLOAD`).
 - Local env (`env=local`) skips the CDN and returns the API-served path.
