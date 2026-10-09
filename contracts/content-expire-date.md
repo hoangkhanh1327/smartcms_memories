@@ -34,3 +34,8 @@ Apply → `{ mode, source, updated[], unchanged, not_found[], popular_updated, r
 - Logs: one row per content, one per changed TPW_POPULAR row, one summary row per run (object_id null).
 
 Replaced the unauthenticated-permission `POST /private/update-music-video-expire-date` (removed 2026-10-09).
+
+## Chunked apply (2026-10-09)
+- Apply body also accepts `defer_crontab?: boolean` and `crontab_type_ids?: number[]`; result adds `touched_type_ids`.
+- FE sends 500 rows per apply request: earlier parts `defer_crontab: true`, last part `crontab_type_ids` = union of earlier `touched_type_ids`, so page crontab is pushed once for every TYPE_ID. Reason: per-row `*_AFTER_UPDATE` triggers make a 5000-row request exceed the FE 120s timeout.
+- Same idea for internal content-tag-restore / movie-tags apply: max 1000 rows per call, `cursor` in / `next_cursor` out (`step:afterId`), crontab on the last part only.
