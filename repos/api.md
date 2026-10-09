@@ -13,7 +13,8 @@ links:
   - contracts/ai-dubbing.md
   - contracts/content-edit.md
   - contracts/content-media-upload.md
-updated: '2026-10-07'
+  - contracts/content-expire-date.md
+updated: '2026-10-09'
 ---
 # `api-smart-cms` — API-side
 
@@ -182,3 +183,10 @@ content/shared/content-edit/          # pure 008 helpers: field catalogue, body 
 - Legacy conventions kept: VOD and Movie store an inactive episode as `-1` (Music uses `0`).
 - Media-upload HMAC key derivation still uses the label `content-media-upload` — do not rename it
   (would invalidate tokens issued before a deploy).
+
+## Internal module and shared content bulk tools (2026-10-09)
+
+- `src/modules/internal/` — "Nội bộ" tools guarded by `InternalUserGuard`: a hardcoded username whitelist in `internal-users.const.ts` (mirrored in web `src/modules/internal/internalAccess.ts`; change both). No admin bypass, no @RouteInfo permissions. Holds content tag restore, bulk movie tags, MV category assign, log file download (only `public/logs` + `public/log_Redis`), lookups and the internal expire-date endpoint.
+- `src/modules/content/shared/content-cache/` — `ContentCacheRefreshService` + per-table cache configs (Redis detail write/reset by status, crontab keywords by TYPE_ID) for any bulk write to content tables.
+- `src/modules/content/shared/content-expire-date/` — bulk EXPIRE_DATE service used by movie, VOD, music-video and internal; see [[contracts/content-expire-date.md]].
+- `private` module no longer has log download, tag or MV category/expire-date endpoints (all moved behind auth/permissions).
