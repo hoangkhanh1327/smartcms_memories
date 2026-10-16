@@ -13,7 +13,8 @@ summary: >-
 status: ready
 links:
   - contracts/content-edit.md
-updated: '2026-10-07'
+  - contracts/content-cate.md
+updated: '2026-10-16'
 ---
 # Content media upload — feature 008
 
@@ -47,3 +48,10 @@ path>, ... }, token }`.
   freshly uploaded image removed before saving used to come back).
 - Every upload writes an audit log entry (`module: CONTENT_MEDIA_UPLOAD`).
 - Local env (`env=local`) skips the CDN and returns the API-served path.
+
+## Category kinds (feature 011, 2026-10-16)
+
+`MediaKind` = content kinds + `VOD_CATE` | `MOVIE_CATE` | `MUSIC_CATE`. Routes `POST content/media-upload/{vod-cate|movie-cate|music-cate}/{create|update}`
+reuse `vod-category.*`, `movies-category.*`, `music-clip-cate.*` create/update keys. Slots: VOD `CATE_POSTER_B2B`, `CATE_DEFAULT_POSTER`;
+Movie `CATE_POSTER_B2B`; Music `CATE_POSTER` — no size/format limit beyond `imageFileFilter` (as before). Tokens are bound to the
+kind, so a content token can't be used on a category and vice versa. See `contracts/content-cate.md`.
