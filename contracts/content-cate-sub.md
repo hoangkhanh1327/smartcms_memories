@@ -50,3 +50,12 @@ updated: '2026-10-19'
 - TPW menu "Cate phụ": right column `typeContent=2` reads CONTENT_CATE_SUB; left COUNT resolves parents per group
   (CATE_IDs of the two tables can collide).
 - Excel import auto-links only tournaments (unchanged).
+
+## Code map (after review, 2026-10-19)
+- `shared/content-cate-sub/`: `entities/`, `repositories/` (all SQL, every query scoped by SUB_TYPE_ID), `services/`
+  (`ContentCateSubService` tree rules — CATE_CODE recomputed in TS, written with one `UPDATE … CASE`;
+  `ContentCateSubLinksService`). Writes take a `SubCateActor { user, url }` for the awaited audit.
+- Tab-3 links of VOD / movie forms: injectable `ContentCateLinkService` (`shared/tournament-cate/content-cate-link.module.ts`,
+  imported by VOD core + Movie modules) — `assertMatchesType`, `syncForContent` (returns tournament-changed flag),
+  `csvForContent`, `copySubCateLinks`. The old `content-tournament-cate.helper` is gone.
+- `DELETE content/anime-cate/vods/:id` takes a link ID (bad ID → 400 "Mã liên kết nội dung không hợp lệ").
