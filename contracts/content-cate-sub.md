@@ -1,61 +1,66 @@
 ---
-title: Secondary categories ("Danh mục phụ") — Anime first
+title: Secondary categories ("Danh mục phụ") — Anime + Giải đấu
 summary: >-
-  Anime genres live in CONTENT_CATE_SUB (SUB_TYPE_ID = 2) with links in
-  CONTENT_CATE_SUB_LIST; anime-cate API restandardised like 011 (JSON, PATCH
-  diff, explicit status). Tournament stays on TOURNAMENT_CATE for now.
+  Anime (SUB_TYPE_ID 2, feature 012) and tournaments (SUB_TYPE_ID 1, feature
+  013) live in CONTENT_CATE_SUB with links in CONTENT_CATE_SUB_LIST; nothing
+  reads/writes TOURNAMENT_CATE* any more. Tournament roots are owned by TOURNEY
+  (CONTENT_CATE_SUB.TOURNEY_ID) and locked on the sub-cate screen.
 tags:
   - contract
   - api
   - web
   - content
   - anime
+  - tournament
   - cate-sub
 status: ready
 links:
   - contracts/content-cate.md
   - contracts/content-edit.md
-updated: '2026-10-19'
+updated: '2026-10-20'
 ---
-# Secondary categories ("Danh mục phụ") — feature 012
+# Secondary categories ("Danh mục phụ") — features 012 + 013
 
 ## Storage
-- `CONTENT_CATE_SUB`: tree per `SUB_TYPE_ID` (`CONTENT_TYPE_SUB`: 1 Thể thao, 2 Anime). Columns: CATE_ID, CATE_NAME, CATE_CODE
-  (`'0'` root, `'0_<root>_…_<parent>'`), PARENT_ID, CATE_NODE_TYPE (1 root / 2 child, server), SORT_ORDER, STATUS (0/1),
-  HIDDEN_DEVICE_LIST (v1, server-derived) + HIDDEN_DEVICE_LIST_V2, USER_*, CREATED_AT, MODIFIED_AT, GROUP_CATEGORY_ID
-  (default 1, never written), SPORT_ID / CATE_LINK (never written). No logo / date / league columns.
+- `CONTENT_CATE_SUB`: tree per `SUB_TYPE_ID` (`CONTENT_TYPE_SUB`: 1 Thể thao / Giải đấu, 2 Anime). Columns: CATE_ID, CATE_NAME,
+  CATE_CODE (`'0'` root, `'0_<root>_…_<parent>'`), PARENT_ID, CATE_NODE_TYPE (1 root / 2 child, server), SORT_ORDER,
+  STATUS (0/1), HIDDEN_DEVICE_LIST (v1, server-derived) + HIDDEN_DEVICE_LIST_V2, USER_*, CREATED_AT, MODIFIED_AT,
+  GROUP_CATEGORY_ID (default 1, never written), SPORT_ID, CATE_LINK, TOURNEY_ID (int, default 0, no index).
+- Tournament roots (SUB_TYPE_ID 1, PARENT_ID 0): `TOURNEY_ID` → `TOURNEY.TOURNEY_ID`; CATE_NAME / SPORT_ID copied from
+  TOURNEY; STATUS = tournament visibility. Ids are NOT assumed equal for new tournaments (migrated rows happen to match).
 - `CONTENT_CATE_SUB_LIST`: ID, CATE_ID, CONTENT_ID, TYPE_ID. CONTENT_ID mixes CONTENT_ID (VOD) and MOVIE_ID (movie);
   always filter by the TYPE_ID group (`resolveCateLinkTypeIds`).
-- Anime no longer reads/writes TOURNAMENT_CATE / TOURNAMENT_CATE_LIST (no dual-write). Old-data migration is done
-  outside the code, keeps CATE_ID, and ships with the release. Tournament (SUB_TYPE_ID 1) is still on TOURNAMENT_CATE.
+- No code reads/writes TOURNAMENT_CATE / TOURNAMENT_CATE_LIST (no dual-write). Old-data migration is outside the code,
+  keeps ids, ships with the release. TOURNAMENT_HOMEPAGE is unused (013 Q11).
 
-## API — `content/anime-cate` (menu_key `anime-cate`, permission names unchanged)
-- Shared module `src/modules/content/shared/content-cate-sub/` (`ContentCateSubService`, `ContentCateSubLinksService`,
-  registry `SUB_CATE_TYPE_CONFIG`); every query is scoped by SUB_TYPE_ID. Envelope: `ContentEditResponseInterceptor`.
-- `GET /` (?CATE_NAME, ?STATUS) full rows, v1→v2 fallback batched · `GET :id` · `POST /` JSON
-  `{ CATE_NAME*, PARENT_ID?, SORT_ORDER? (1–10000, default max+1), STATUS? (default 0), HIDDEN_DEVICE_LIST_V2? number[] }`
-  · `PATCH :id` changed fields only (empty → 400; `[]` clears devices; numbers cannot be null) · `PATCH :id/status`
-  `{ STATUS: 0|1 }` applied to the whole subtree (empty body → 409 reload) · `PUT sort-order { items:[{CATE_ID, SORT_ORDER}] }`
-  · `DELETE :id` subtree + its links (one tx) · `GET vods/:id` linked VOD + movie (paged) · `DELETE vods/:id` unlink.
-- Old `PUT :id` and `PUT update-status/:id` are 409 stubs ("Trang đã có phiên bản mới, vui lòng tải lại trang").
-- Rules: root names unique (case-insensitive) → 422; parent must exist in the same SUB_TYPE_ID; self/descendant parent
-  → 422; CATE_CODE > 50 chars → 400; parent move rewrites the subtree prefix in one UPDATE; audit module
-  `ANIME_CATE` / `ANIME_CATE_LIST`, awaited.
+## API (shared module `src/modules/content/shared/content-cate-sub/`, envelope `ContentEditResponseInterceptor`)
+- Registry `SUB_CATE_TYPE_CONFIG`: ANIME (subTypeId 2, log `ANIME_CATE`), SPORT (subTypeId 1, log `TOURNAMENT_CATE`,
+  `rootsOwnedByTourney: true`). Every query is scoped by SUB_TYPE_ID.
+- Leaves with the same route set: `content/anime-cate` (menu `anime-cate`, old PUT :id / PUT update-status/:id are 409
+  stubs) and `content/tournament-sub-cate` (menu `tournament-sub-cate`, `tournament` crontab on writes):
+  `GET /` (?CATE_NAME, ?STATUS) · `GET :id` · `POST /` JSON `{ CATE_NAME*, PARENT_ID?, SORT_ORDER? (1–10000, default
+  max+1), STATUS? (default 0), HIDDEN_DEVICE_LIST_V2? number[] }` · `PATCH :id` changed fields only · `PATCH :id/status
+  { STATUS: 0|1 }` (whole subtree) · `PUT sort-order` · `DELETE :id` (subtree + links) · `GET vods/:id` · `DELETE vods/:id`.
+  Read-only for clients: CATE_ID, CATE_CODE, CATE_NODE_TYPE, HIDDEN_DEVICE_LIST, SUB_TYPE_ID, TOURNEY_ID, SPORT_ID,
+  GROUP_CATEGORY_ID, CATE_LINK, USER_*, dates.
+- SPORT root locks (all 422): create with PARENT_ID 0, rename / move a root, move a child to PARENT_ID 0, delete a root.
+  Root STATUS / SORT_ORDER / hidden devices stay editable. ("Root" = PARENT_ID 0.)
+- Internal API used by the tournament module (inside its transaction): `createTourneyRoot`, `syncTourneyRoot`
+  (CATE_NAME / SPORT_ID), `setStatus(…, manager?)`, `findTourneyRoots(ids | null)`, `countChildrenAndLinks`,
+  `deleteTourneyRoot`. Their audit is part of the tournament's audit row (module `TOURNEY`).
+- Excel CATE_LINK auto-link: `ContentCateSubLinksService.findCateIdsByCateLink(typeId, contentCateIds)` reads SPORT rows
+  with CATE_LINK and parses the JSON in TS (CSV or array `cate_list`); `ContentCateLinkService.linkTourneysByCateLink`
+  adds only missing links (used by `importExcelVod` and handle-excel inside its query runner).
 
 ## Consumers
-- Edit forms (008 contract field `TOURNAMENT_CATE_LIST`, name unchanged): `content-tournament-cate.helper` dispatches by
-  tree type — Anime TYPE_IDs (2, 6, 20, 22, 25) → CONTENT_CATE_SUB_LIST, tournament (12, 78) → TOURNAMENT_CATE_LIST.
-  VOD duplication copies both link tables.
-- `lookup/cate-tree-options`: Anime tree from CONTENT_CATE_SUB (STATUS 1); response `{ TYPE_CONTENT, items }` unchanged.
-- TPW menu "Cate phụ": right column `typeContent=2` reads CONTENT_CATE_SUB; left COUNT resolves parents per group
-  (CATE_IDs of the two tables can collide).
-- Excel import auto-links only tournaments (unchanged).
+- VOD / movie edit forms (008 field `TOURNAMENT_CATE_LIST`, name unchanged): `ContentCateLinkService` → sub-cate links for
+  both trees (tournament TYPE_IDs 12, 78; Anime 2, 6, 20, 22, 25); roots and children selectable; `syncForContent`
+  returns true when tournament links change (queue `tournament` crontab). VOD duplication copies CONTENT_CATE_SUB_LIST only.
+- `lookup/cate-tree-options` and TPW menu "Cate phụ" (right column + left COUNT) read CONTENT_CATE_SUB for every
+  registered sub type; unregistered → [].
+- Web: module `src/modules/content/SubCate` (ex-AnimeCate) parameterised by type (`SUB_CATE_TYPES`): Anime at
+  `/content/anime/category`, Giải đấu at `/content/sub-cate/tournament` (`?root=<CATE_ID>` filters to one tournament).
 
-## Code map (after review, 2026-10-19)
-- `shared/content-cate-sub/`: `entities/`, `repositories/` (all SQL, every query scoped by SUB_TYPE_ID), `services/`
-  (`ContentCateSubService` tree rules — CATE_CODE recomputed in TS, written with one `UPDATE … CASE`;
-  `ContentCateSubLinksService`). Writes take a `SubCateActor { user, url }` for the awaited audit.
-- Tab-3 links of VOD / movie forms: injectable `ContentCateLinkService` (`shared/tournament-cate/content-cate-link.module.ts`,
-  imported by VOD core + Movie modules) — `assertMatchesType`, `syncForContent` (returns tournament-changed flag),
-  `csvForContent`, `copySubCateLinks`. The old `content-tournament-cate.helper` is gone.
-- `DELETE content/anime-cate/vods/:id` takes a link ID (bad ID → 400 "Mã liên kết nội dung không hợp lệ").
+## Menus / permissions (stage applied 2026-10-20; prod with the release)
+- "Danh mục phụ" (`anime`) ⊃ Anime (`anime-cate`), Giải đấu (`tournament-sub-cate`). Script + grants:
+  `api/.ai/features/013-tourney-content-cate-sub/baseline/menu-013.js`.
