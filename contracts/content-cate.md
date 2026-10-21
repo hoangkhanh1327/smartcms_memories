@@ -7,7 +7,9 @@ status: ready
 links:
   - contracts/content-media-upload.md
   - contracts/content-edit.md
-updated: '2026-10-16'
+  - contracts/sports.md
+  - contracts/group-category.md
+updated: '2026-10-21'
 ---
 # Content category contract (VOD / Movie / Music) — feature 011
 
@@ -61,3 +63,8 @@ API core: `api:src/modules/content/shared/content-cate/` (`ContentCateService`, 
 
 - E2E: `web/e2e/support/contentCate.ts` (`defineCateSuite`) + `{vod,movie,music}-cate.spec.ts` write only `[E2E-011] …` rows
   on the shared stage DB; delete them afterwards with `api/.ai/features/011-content-cate-standardization/baseline/cleanup-e2e-cates.js <TABLE> preview|delete <ids>`.
+
+## Fixed-type kinds (feature 013 / 014)
+`CATE_KINDS` = VOD, MOVIE, MUSIC, TOURNEY (89), **SPORTS (SPORTS_CATE, 96)**, **GROUP_CATEGORY (GROUP_CATEGORY_CATE, 97)**.
+The three fixed-type kinds (`FIXED_TYPE_CATE_KINDS`) share one shape: server-owned TYPE_ID, no EN name / images / link
+fields, hidden devices v2 → v1, no delete, `listFixedTypeCate(kind)`. Leaves: `content/{tourney,sports,group-category}-cate`.
