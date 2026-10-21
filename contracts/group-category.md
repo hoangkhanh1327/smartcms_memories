@@ -3,8 +3,8 @@ title: Category groups (GROUP_CATEGORY) and their categories (GROUP_CATEGORY_CAT
 summary: >-
   Feature 014: "Nhóm loại danh mục" is GROUP_CATEGORY (menu/permissions
   `group-category.*` under Sporthub, TOURNEY-like shape with raw-JSON
-  URL_GET_DATA) with categories in GROUP_CATEGORY_CATE_LIST; "Thể loại nhóm loại
-  danh mục" is GROUP_CATEGORY_CATE (TYPE_ID 97). Delete blocked while
+  URL_GET_DATA) with categories in GROUP_CATEGORY_CATE_LIST; "Thể loại nhóm danh
+  mục" is GROUP_CATEGORY_CATE (TYPE_ID 97). Delete blocked while
   CONTENT_CATE_SUB / TPW_MENU_CATE_DATA_ALL reference the group.
 tags:
   - contract
@@ -31,7 +31,8 @@ updated: '2026-10-21'
   Giải đấu roots carry 0) and `TPW_MENU_CATE_DATA_ALL.GROUP_CATEGORY_ID`. CMS never writes those columns (out of scope).
 
 ## API — `content/group-category` (module `src/modules/content/group-category/`, menu `group-category`)
-- `GET /` (?NAME, ?STATUS) ordered SORT_ORDER, ID; rows + `GROUP_CATEGORY_CATE_IDS`, `GROUP_CATEGORY_CATES` · `GET :id`.
+- `GET /` (?NAME, ?STATUS) ordered SORT_ORDER, ID; rows + `GROUP_CATEGORY_CATE_IDS`, `GROUP_CATEGORY_CATES` · `GET :id`
+  (row + categories read in parallel). p99 < 75 ms on stage.
 - `POST /` JSON `{ NAME* (unique → 422), LOGO_PHONE*, LOGO_TV*, LOGO_TV_SMALL*, SORT_ORDER? (default max+1, 1–10000),
   STATUS? (default 1), URL_GET_DATA? (string parsing to a JSON object → else 400 "Trường URL_GET_DATA phải là JSON hợp
   lệ"; null clears), GROUP_CATEGORY_CATE_IDS?, MEDIA_TOKENS }` · `PATCH :id` changed fields only.
@@ -40,7 +41,7 @@ updated: '2026-10-21'
 - Logos: `POST content/media-upload/group-category/{create,update}` (kind GROUP_CATEGORY, same sizes as TOURNEY).
 - Audit module `GROUP_CATEGORY`. No crontab cache keyword.
 
-## API — `content/group-category-cate` (menu `group-category-cate`) and lookup
+## API — `content/group-category-cate` (menu `group-category-cate`, "Thể loại nhóm danh mục") and lookup
 - Fixed-type content-cate kind `GROUP_CATEGORY` (same routes as sports-cate, no delete).
   `GET lookup/group-category-cates` (JWT only).
 
