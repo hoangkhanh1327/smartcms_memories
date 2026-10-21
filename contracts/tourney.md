@@ -16,7 +16,9 @@ status: ready
 links:
   - contracts/content-cate-sub.md
   - contracts/content-cate.md
-updated: '2026-10-20'
+  - contracts/sports.md
+  - contracts/group-category.md
+updated: '2026-10-21'
 ---
 # Tournaments — feature 013
 
@@ -50,3 +52,14 @@ updated: '2026-10-20'
 ## Web
 - `VOD/Tournament` (Danh sách giải đấu, `/content/tournament`), `VOD/TourneyCate` (`/content/tourney-cate`) under the
   Sporthub menu; tournament-homepage routes removed. MatchSchedule's LiveScore list moved to its own `LivescoreProvider`.
+
+## Changes from feature 014 (2026-10-21)
+- Lookup: `GET lookup/tourney-cates` now lives in `src/modules/lookup/fixed-type-cate-options/` (one service keyed by
+  kind, also serving `lookup/sports-cates` and `lookup/group-category-cates`); URL and shape unchanged.
+- `ContentCateService.listTourneyCate` → `listFixedTypeCate(kind, query)`; TOURNEY output unchanged.
+- Body validation / cate-list SQL are shared: `content/shared/entity-catalogue` (field catalogue + pipes) and
+  `content/shared/cate-list/cate-list-table.ts`; tourney behaviour unchanged (013 specs untouched).
+- Web: `VOD/TourneyCate` became the generic `VOD/FixedTypeCate` (kinds TOURNEY / SPORTS / GROUP_CATEGORY, same
+  `/content/tourney-cate` routes and `TourneyCateOptions` tag); the category tree picker is shared
+  `FixedTypeCateTreeField`; logo slots use shared `MantineImageSlotField`; notifications `notifyEditSuccess/Failure`.
+- `SportSelect` shows a hidden selected sport as "Môn #id (đã ẩn)".
