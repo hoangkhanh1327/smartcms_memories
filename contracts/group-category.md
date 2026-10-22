@@ -17,7 +17,8 @@ links:
   - contracts/tourney.md
   - contracts/content-cate.md
   - contracts/content-cate-sub.md
-updated: '2026-10-21'
+  - contracts/tpw-menu-cate.md
+updated: '2026-10-22'
 ---
 # Category groups — feature 014
 
@@ -28,7 +29,8 @@ updated: '2026-10-21'
 - `GROUP_CATEGORY_CATE_LIST`: (CONTENT_ID = ID, CATE_ID). `GROUP_CATEGORY_CATE`: TYPE_ID fixed **97**; VOD Common TPW
   group 22 reads it.
 - Referenced by `CONTENT_CATE_SUB.GROUP_CATEGORY_ID` (**column default 1** → group 1 is effectively undeletable; the
-  Giải đấu roots carry 0) and `TPW_MENU_CATE_DATA_ALL.GROUP_CATEGORY_ID`. CMS never writes those columns (out of scope).
+  Giải đấu roots carry 0; CMS never writes this column) and `TPW_MENU_CATE_DATA_ALL.GROUP_CATEGORY_ID` (written by the
+  TPW menu cate config, menu type 12 — see contracts/tpw-menu-cate.md).
 
 ## API — `content/group-category` (module `src/modules/content/group-category/`, menu `group-category`)
 - `GET /` (?NAME, ?STATUS) ordered SORT_ORDER, ID; rows + `GROUP_CATEGORY_CATE_IDS`, `GROUP_CATEGORY_CATES` · `GET :id`
