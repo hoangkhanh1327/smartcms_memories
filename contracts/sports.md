@@ -17,7 +17,7 @@ links:
   - contracts/tourney.md
   - contracts/content-cate.md
   - contracts/content-media-upload.md
-updated: '2026-10-21'
+updated: '2026-10-22'
 ---
 # Sports — feature 014
 
@@ -51,3 +51,20 @@ updated: '2026-10-21'
   button; create omits SLUG when untouched (server generates).
 - `VOD/FixedTypeCate` kind SPORTS (`/content/sports-cate`); tree picker `FixedTypeCateTreeField kind="SPORTS"`.
 - `SportSelect` (Giải đấu form) shows a selected-but-hidden sport as "Môn #id (đã ẩn)".
+
+## Change 2026-10-22 — category screens leave the menu (all three fixed-type kinds)
+- "Thể loại môn thể thao" / "Thể loại giải đấu" / "Thể loại nhóm danh mục" no longer have a sidebar item. They open from a
+  **"Thể loại"** button on the parent list page (`/content/sports`, `/content/tournament`, `/content/group-category`);
+  the category list has a back button to the parent (`FIXED_TYPE_CATE_SCREENS[kind].parent`,
+  `FixedTypeCate/components/FixedTypeCateLinkButton.tsx`). Routes `/content/*-cate` are unchanged.
+- Permission names are unchanged (`sports-cate.*`, `tourney-cate.*`, `group-category-cate.*`), but the controllers'
+  `@RouteInfo` `menu_key` is now the parent (`sports`, `tournament`, `group-category`), so permission-sync keeps the
+  level-4 rows under the parent and the role editor shows them there.
+- DB: level-3 rows `sports-cate` / `tourney-cate` / `group-category-cate` are `isactive = 0` (not deleted), and their
+  level-4 rows are re-parented — script `.ai/features/014-sports-group-category/baseline/menu-cate-buttons.js`
+  (preview / apply / revert; matched by menu_key). Applied on stage 2026-10-22; **prod must run `apply` in the same
+  release as the API change.**
+- Why not just `isactive = 0`: the role editor (`GET /administration/menu`, active rows only, tree by menu_parent)
+  drops level-4 rows whose parent is inactive, so the permissions could no longer be granted.
+- Side effects: no sidebar item is highlighted on the category screens, and the "HDSD" button (needs the menu row's
+  `guide_url`) does not show there.
