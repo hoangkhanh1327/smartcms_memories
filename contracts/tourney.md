@@ -18,7 +18,7 @@ links:
   - contracts/content-cate.md
   - contracts/sports.md
   - contracts/group-category.md
-updated: '2026-10-21'
+updated: '2026-10-22'
 ---
 # Tournaments — feature 013
 
@@ -63,3 +63,11 @@ updated: '2026-10-21'
   `/content/tourney-cate` routes and `TourneyCateOptions` tag); the category tree picker is shared
   `FixedTypeCateTreeField`; logo slots use shared `MantineImageSlotField`; notifications `notifyEditSuccess/Failure`.
 - `SportSelect` shows a hidden selected sport as "Môn #id (đã ẩn)".
+
+## Change 2026-10-22 — "Thể loại giải đấu" leaves the menu
+- Opened by the "Thể loại" button on `/content/tournament`; `TourneyCateController` `@RouteInfo` `menu_key` is now
+  `tournament` (the real level-3 row of "Danh sách giải đấu", id 57784 on stage); `tourney-cate.*` level-4 rows moved
+  under it and the `tourney-cate` level-3 row is inactive. Full details: contracts/sports.md "Change 2026-10-22".
+- Pre-existing mismatch (not fixed): `TourneyController` declares `menu_key: 'tournament-cate'`, which has no level-3
+  menu row, so permission-sync skips the `tournament-cate.*` permissions (`parent_not_found`); those rows already sit
+  under `tournament`.
