@@ -68,3 +68,10 @@ updated: '2026-10-22'
   drops level-4 rows whose parent is inactive, so the permissions could no longer be granted.
 - Side effects: no sidebar item is highlighted on the category screens, and the "HDSD" button (needs the menu row's
   `guide_url`) does not show there.
+
+## Correction 2026-10-22 — no menu scripts for prod
+- `menu-014.js` and `menu-cate-buttons.js` were deleted (owner decision; feature 014 was not on prod yet). Prod menus,
+  permission rows and role grants are added **by hand** at release. Target state: sidebar items `sports` and
+  `group-category` under Sporthub; no items for the three category screens; their level-4 permissions under
+  `tournament` / `sports` / `group-category` (= controllers' `@RouteInfo` `menu_key`, so permission-sync places them
+  there once the parent rows exist). Stage already matches this state.
