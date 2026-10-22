@@ -50,3 +50,8 @@ updated: '2026-10-22'
 ## Web
 - `VOD/GroupCategory` (`/content/group-category`): URL_GET_DATA as a monospace textarea with client JSON check.
 - `VOD/FixedTypeCate` kind GROUP_CATEGORY (`/content/group-category-cate`).
+
+## Change 2026-10-22 — "Thể loại nhóm danh mục" leaves the menu
+- Opened by the "Thể loại" button on `/content/group-category`; `GroupCategoryCateController` `@RouteInfo` `menu_key` is
+  now `group-category`; `group-category-cate.*` level-4 rows moved under it and the `group-category-cate` level-3 row is
+  inactive. Full details: contracts/sports.md "Change 2026-10-22".
