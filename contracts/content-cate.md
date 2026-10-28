@@ -9,7 +9,7 @@ links:
   - contracts/content-edit.md
   - contracts/sports.md
   - contracts/group-category.md
-updated: '2026-10-21'
+updated: '2026-10-28'
 ---
 # Content category contract (VOD / Movie / Music) — feature 011
 
@@ -68,3 +68,24 @@ API core: `api:src/modules/content/shared/content-cate/` (`ContentCateService`, 
 `CATE_KINDS` = VOD, MOVIE, MUSIC, TOURNEY (89), **SPORTS (SPORTS_CATE, 96)**, **GROUP_CATEGORY (GROUP_CATEGORY_CATE, 97)**.
 The three fixed-type kinds (`FIXED_TYPE_CATE_KINDS`) share one shape: server-owned TYPE_ID, no EN name / images / link
 fields, hidden devices v2 → v1, no delete, `listFixedTypeCate(kind)`. Leaves: `content/{tourney,sports,group-category}-cate`.
+
+## Delete (added 2026-10-28) — VOD / Movie / Music
+
+| | VOD | Movie | Music |
+|---|---|---|---|
+| delete | `DELETE content/content-category/:CATE_ID` (`vod-category.delete`) | `DELETE content/cate-movie/:cate_id` (`movies-category.delete`) | `DELETE content/music-cate/:cateId` (`music-clip-cate.delete`) |
+
+- One service method, `ContentCateService.remove(kind, id, user, url)`; `CATE_KIND_CONFIG[kind].linkTable` names the content
+  link table (`CONTENT_CATE_LIST`, `MOVIE_CATE_LIST`, `MUSIC_VIDEO_CATE_LIST`; the three fixed-type kinds have one too but
+  expose no delete route yet).
+- **Blocked with 422** (nothing is written, no audit): the category is a **parent** of another category
+  ("Không thể xoá: danh mục đang là cha của danh mục N"), or it is **linked to content** ("…đã được gắn với nội dung").
+  Both checks and the `DELETE` run in one transaction. Unknown id → 404. Success → ADR 0001 envelope `{ deleted: id }`;
+  audit `Delete` (with the full row as backup) is written before the response.
+- Not checked (deliberately out of scope): references from other tables (TPW menu config, `CATE_ID_LINK` of other categories).
+- **New permission names** (`*.delete`) need a permission-sync run and a role grant before non-admin roles can use them
+  (ADR 0004). Until then the web shows the "Xoá" action to everyone and a role without the grant gets 403.
+- Web: `CategoryList` takes `onDelete`; columns add the menu item with `cateDeleteItems(helpers)`; a danger `ConfirmDialog`
+  stays open and shows the API message when the delete is refused.
+- E2E now **deletes** its `[E2E-011]` rows (leaf → root) and asserts the 422 guard, so the cleanup script is only needed
+  after an aborted run. The category table is virtualised: e2e must filter by name before locating a row.
