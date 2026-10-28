@@ -2,7 +2,7 @@
 title: Conventions
 tags:
   - conventions
-updated: '2026-09-29'
+updated: '2026-10-28'
 summary: >-
   Shared conventions, split into cross-repo (API + frontend), API-only and
   frontend-only parts. All four parts are now written.
@@ -328,3 +328,35 @@ unsure, ask the developer instead of writing noise.
 - Respect scope: an ADR under `architecture/decisions/` states its own scope in its Scope section.
   ADR 0001 is **API-only**; ADR 0002 and ADR 0003 are **frontend-only**. Never put a rule from one
   side where the other will read it as shared.
+
+## Use CodeGraph to find code, and sync it on commit/push
+
+Applies to **every CMS repo** (`api`, `web`) and every agent tool. Both repos carry a `.codegraph/`
+index and the `codegraph` CLI (`~/.local/bin/codegraph`); the same queries are exposed as the
+`codegraph_explore` / `codegraph_node` MCP tools where the agent has them.
+
+**Finding code — CodeGraph first, grep second.** Before reading files one by one or grepping, run
+the index:
+
+- `codegraph explore "<area in plain words>"` — relevant symbols' source + call paths + blast radius
+  in one shot. Use it to locate the files of a feature, find callers before changing a shared
+  function, and check what depends on something before deleting it.
+- `codegraph node <symbol|file>` — one symbol's source with its caller/callee trail, or a file with
+  dependents.
+- `codegraph query <text>` — symbol search by name.
+
+Fall back to `grep`/Read only for what the index cannot answer (string literals, config, assets,
+non-code files) or when the index is missing. The "blast radius" section is the cheap way to learn
+whether a file is still imported before removing it.
+
+**Commit / push — sync the index.** Run `codegraph sync` (in the repo being committed) so the index
+reflects the commit, **before `git commit` and again before `git push`** if more files changed in
+between. A stale index sends the next agent to deleted or renamed code. Never `codegraph index`
+(full rebuild) for this — `sync` is incremental.
+
+**Low-RAM dev machine (WSL):** `sync` can take longer than a foreground tool timeout on the web
+repo. Run it in the background with a generous `timeout` and wait for it to finish; do not start a
+second copy while one runs, and do not run it in parallel with a Playwright or Jest run.
+
+Exactly like the memory rule above, this is **mandatory**: skipping it is the same class of mistake
+as committing a new module without updating this memory.
