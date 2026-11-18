@@ -14,7 +14,7 @@ links:
   - contracts/content-edit.md
   - contracts/content-media-upload.md
   - contracts/content-expire-date.md
-updated: '2026-11-16'
+updated: '2026-11-18'
 ---
 # `api-smart-cms` — API-side
 
@@ -196,3 +196,6 @@ content/shared/content-edit/          # pure 008 helpers: field catalogue, body 
 - `src/modules/private/private.module.ts` is now a pure aggregator over three leaf modules: `cdn-callback/` (`GET /private/update-cdn-info`), `cdn-transcode/` (`POST /private/call-cdn-transcode`) and `cms-io-files/`; `query-console-v2/` stays its own module. `PrivateController`, `PrivateService` and the `'PrivateService'` string token are gone. Pure move: both `/private/*` routes stay `@Public` (called by the CDN, no token) and still answer HTTP 200 with `{ status: 'error', message }` on failure — keep that contract, the CDN side may depend on it.
 - New authenticated twins for the web "Nội bộ" pages: `POST /internal/cdn/callback` and `POST /internal/cdn/transcode` (`src/modules/internal/cdn/internal-cdn.controller.ts`, `InternalUserGuard`). They reuse the leaf services (leaf modules export them) but return real HTTP 400 (typed `BadRequestException`, legacy services throw plain `Error`). Web pages: `CdnCallback`, `CdnTranscode` under `web/src/modules/internal/`.
 - Known gap: `CdnTranscodeService.handle` swallows a CDN `status: 'error'` (no throw), so the internal page still reports success in that case.
+
+## Product module — rewritten 2026-11-18 (feature 017)
+`modules/businessRule/product/` is a thin aggregator over leaves: `product-catalog` (list/detail/create/update/status/hidden-device/plugin), `product-module`, `product-area`, `product-service`, `product-config`, `product-publish`, `product-shared` (permissions `product.*`, envelope interceptor, audit, actor), and `product-legacy` (old `GET /products`, `/products/:id`, tokens `IProductRepository/IProductService` still exported to ~15 modules). Stored procedures replaced by TypeORM queries; every mutation audited; bulk writes in transactions. See `contracts/product.md`. Pending before deploy: run `migration/261118_products_indexes.sql`, permission-sync dry-run on stage, grant `product.*` manually, measure list p99.
