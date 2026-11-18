@@ -16,7 +16,7 @@ links:
   - architecture/decisions/0003-frontend-shared-tables-tanstack.md
   - contracts/content-edit.md
   - contracts/content-media-upload.md
-updated: '2026-10-06'
+updated: '2026-11-18'
 ---
 # `smartcms` web — Frontend
 
@@ -207,3 +207,10 @@ neutral JSON contract (`contracts/content-edit.md`); images upload per slot via
   dirty on open. Yup fields that may be `null` from the API need `.nullable()`.
 - E2E: `e2e/support/contentEdit.ts` `defineContentEditSuite(test, config)` drives
   `e2e/tests/{vod,movie,music-clip}-edit-form.spec.ts`.
+
+## Product ("Gói cước") module — rewritten 2026-11-18 (feature 019)
+- `src/modules/businessRule/Product`: Mantine + `shared/tables` (NormalTable/SortTable), `@mantine/form` + Yup. Service layer `services/product.service.ts` is the only API boundary (contract: `contracts/product.md`); one RTK `createApi` (`rtkProductApi`, already registered — do not add another, see createApi limit).
+- List/filters live in the URL (`status=0` is a valid filter); sub-views `manage-module|manage-user-team|manage-service/:id`, `config-upgrade-package?product_id=`; routes in `configs/routes.config/businessRule/product.route.tsx`.
+- Promoted to `shared/selects`: `ProductBusinessTypeSelect`, `ProductTypeSelect` (used by Product + ProductPlugin). Other selects stay module-local (1 consumer).
+- Wizard `/products/package-configuration` kept (step 1 reuses `ProductForm`; steps 2–5 are UserTeam/Service Formik forms, untouched).
+- Verified: vitest (58 unit tests), TS5 scoped tsc, Playwright `e2e/tests/product-list.spec.ts` (mocked API). Not verified: create/edit form and sub-views against a real API.
