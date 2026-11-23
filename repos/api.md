@@ -14,7 +14,8 @@ links:
   - contracts/content-edit.md
   - contracts/content-media-upload.md
   - contracts/content-expire-date.md
-updated: '2026-11-18'
+  - contracts/product-plugin.md
+updated: '2026-11-23'
 ---
 # `api-smart-cms` — API-side
 
@@ -199,3 +200,6 @@ content/shared/content-edit/          # pure 008 helpers: field catalogue, body 
 
 ## Product module — rewritten 2026-11-18 (feature 017)
 `modules/businessRule/product/` is a thin aggregator over leaves: `product-catalog` (list/detail/create/update/status/hidden-device/plugin), `product-module`, `product-area`, `product-service`, `product-config`, `product-publish`, `product-shared` (permissions `product.*`, envelope interceptor, audit, actor), and `product-legacy` (old `GET /products`, `/products/:id`, tokens `IProductRepository/IProductService` still exported to ~15 modules). Stored procedures replaced by TypeORM queries; every mutation audited; bulk writes in transactions. See `contracts/product.md`. Pending before deploy: run `migration/261118_products_indexes.sql`, permission-sync dry-run on stage, grant `product.*` manually, measure list p99.
+
+## Product Plugin module — rewritten 2026-11-23 (feature 018, in progress)
+`modules/businessRule/product-plugin/` is a thin aggregator (`product-plugin.module.ts`) over leaves: `plugin-catalog` (manage list/detail, create/update, status, hidden-device, delete), `plugin-service`, `plugin-channel` (list/options, assign, row update/toggle/delete), `plugin-shared` (permissions `product-plugin.*`, envelope interceptor, audit, actor, DTO helpers), `plugin-legacy` (old controller + the 4 `IProductPlugin*` string tokens used by ~40 files elsewhere, `@deprecated`) and `plugin-b2c` (B2C V2/promotion, untouched, out of scope). Migration only: the channel assignment is a bug-for-bug TypeScript port of SP `product_plugin_channel_update` (keeps its tstv/tvod typo). Upload of the bundle logo goes through `content/media-upload/product-plugin` (new media kind `PRODUCT_PLUGIN`). Scoped TS5 typecheck helper idea: build a `ts.createProgram` over just the consumer files (ignore the `req.user` augmentation noise). Pending before deploy: run `product-plugin/migration/261123_product_plugin_indexes.sql` (plain indexes — data already has duplicates), permission-sync dry-run, grant `product-plugin.*`. See `contracts/product-plugin.md`.
