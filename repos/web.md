@@ -16,7 +16,8 @@ links:
   - architecture/decisions/0003-frontend-shared-tables-tanstack.md
   - contracts/content-edit.md
   - contracts/content-media-upload.md
-updated: '2026-11-18'
+  - contracts/product-plugin.md
+updated: '2026-11-23'
 ---
 # `smartcms` web — Frontend
 
@@ -214,3 +215,12 @@ neutral JSON contract (`contracts/content-edit.md`); images upload per slot via
 - Promoted to `shared/selects`: `ProductBusinessTypeSelect`, `ProductTypeSelect` (used by Product + ProductPlugin). Other selects stay module-local (1 consumer).
 - Wizard `/products/package-configuration` kept (step 1 reuses `ProductForm`; steps 2–5 are UserTeam/Service Formik forms, untouched).
 - Verified: vitest (58 unit tests), TS5 scoped tsc, Playwright `e2e/tests/product-list.spec.ts` (mocked API). Not verified: create/edit form and sub-views against a real API.
+
+## Product Plugin module — rewritten 2026-11-23 (feature 020)
+- `src/modules/businessRule/ProductPlugin`: Mantine + `shared/tables`, `@mantine/form` + Yup; contract in `contracts/product-plugin.md`. Views are kebab-case and thin: `list|add|edit|manage-service|manage-channel|assign-channel`; routes unchanged (`product-plugin.route.tsx`).
+- External consumers keep working because these names were kept: `store/productPluginQueries` (`useGetActivePluginProductsQuery`, `GET /product-plugin?limit=-1`), `services/productPlugin.service` (`apiGetProductPluginListCms`), `@types/productPlugin.types` (`IProductPlugin`, now a superset). One RTK `createApi` (`rtkProductPluginApi`).
+- List filters live in the URL (`status=0` valid); channel filters too (`tvod=0` valid). Quick-edit/assign forms block the API call on invalid input (Yup).
+- Assign channels uses shared `ChannelTransferList`; the right side = channels with `isactive=1`; everything else is turned off on save; TVOD/TSTV (default 3/120) only apply to newly added channels (SP behaviour).
+- Logo upload kind `PRODUCT_PLUGIN` added to `shared/contentEdit` (`content/media-upload/product-plugin`, slot `product_bundle_logo`). `ConfirmModal` moved to `shared/contentEdit/dialogs` (Product + ProductPlugin).
+- No web code calls the deprecated service/channel endpoints any more, so API task T13 can drop them.
+- Verified: vitest 35 tests (services, slice, utils), TS5 scoped, Playwright `product-plugin-list` + `product-plugin-channel` (mocked API, 8 cases). Not verified in a browser against real API: add/edit form, service picker, and the 5 outside screens that read `/product-plugin`.
