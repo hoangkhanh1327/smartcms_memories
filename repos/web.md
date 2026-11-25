@@ -17,7 +17,8 @@ links:
   - contracts/content-edit.md
   - contracts/content-media-upload.md
   - contracts/product-plugin.md
-updated: '2026-11-23'
+  - contracts/service.md
+updated: '2026-11-25'
 ---
 # `smartcms` web — Frontend
 
@@ -224,3 +225,11 @@ neutral JSON contract (`contracts/content-edit.md`); images upload per slot via
 - Logo upload kind `PRODUCT_PLUGIN` added to `shared/contentEdit` (`content/media-upload/product-plugin`, slot `product_bundle_logo`). `ConfirmModal` moved to `shared/contentEdit/dialogs` (Product + ProductPlugin).
 - No web code calls the deprecated service/channel endpoints any more, so API task T13 can drop them.
 - Verified: vitest 35 tests (services, slice, utils), TS5 scoped, Playwright `product-plugin-list` + `product-plugin-channel` (mocked API, 8 cases). Not verified in a browser against real API: add/edit form, service picker, and the 5 outside screens that read `/product-plugin`.
+
+## Service module — rewritten 2026-11-25 (feature 021)
+- `src/modules/businessRule/Service`: Mantine + `shared/tables` + `@mantine/form`/Yup; contract `contracts/service.md` (API feature 019). Routes in `service.route.tsx`: `''|/add|/edit/:id` kept, new `/view/:id`, `/assign-channel/:id`, `/compare?one=&two=`.
+- Reuses the existing RTK instance `rtkServiceApi` (no new createApi). Kept names for outside consumers: `useGetServicesPayQuery`, `useGetServicesByTypeQuery`, `useCreateServicesMutation`, `apiGetServiceByType`, `apiGetServicePay`, types `IService`/`IServicePay`.
+- Promoted to shared: `shared/inputs/ChannelFilterBar` (ProductPlugin now uses it), `shared/selects/{ProviderSelect,ServicePaytvSelect,AreaLookupSelect}` backed by `selectQueries` tags `ProviderOptions`/`ServicePaytvOptions`/`AreaOptions`. `AreaLookupSelect` is named so as not to clash with legacy `custom/Select/AreaSelect`.
+- `EditFooter` disables Save while the form is pristine — e2e must change a field before clicking Save.
+- E2E against local api: `web/.env.local` points to stage api, which lacks 019 endpoints; start web with `VITE_API_URL=http://localhost:5070/api/v1/cms-api/` (skill run-local-e2e).
+- Verified: vitest 83 tests, TS5 scoped, Playwright `business-rule-service.spec.ts` 7/7 Chromium desktop+mobile on real local api. Not verified: Firefox; write flows in the browser (shared stage DB).
