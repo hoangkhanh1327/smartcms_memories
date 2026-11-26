@@ -18,7 +18,8 @@ links:
   - contracts/content-media-upload.md
   - contracts/product-plugin.md
   - contracts/service.md
-updated: '2026-11-25'
+  - contracts/userteam.md
+updated: '2026-11-26'
 ---
 # `smartcms` web — Frontend
 
@@ -233,3 +234,12 @@ neutral JSON contract (`contracts/content-edit.md`); images upload per slot via
 - `EditFooter` disables Save while the form is pristine — e2e must change a field before clicking Save.
 - E2E against local api: `web/.env.local` points to stage api, which lacks 019 endpoints; start web with `VITE_API_URL=http://localhost:5070/api/v1/cms-api/` (skill run-local-e2e).
 - Verified: vitest 83 tests, TS5 scoped, Playwright `business-rule-service.spec.ts` 7/7 Chromium desktop+mobile on real local api. Not verified: Firefox; write flows in the browser (shared stage DB).
+
+## User Team module — rewritten 2026-11-26 (feature 022)
+- `src/modules/businessRule/UserTeam`: Mantine + `shared/tables` + `@mantine/form`/Yup; contract `contracts/userteam.md` (API feature 020). Routes in `userTeam.route.tsx`: `''|/add|/edit/:id` kept; new `/view/:id` (info card + tabs Kênh / Dịch vụ theo loại / Danh mục, tab in `?tab=`, service/subject type in `?type=`), `/assign-channel/:id`, `/compare?one=&two=`. Old `/channel|service|subject/:id` -> `views/legacy-redirect` (reads `useParams`; RR 6.30 `<Navigate>` does not fill `:id`).
+- Reuses RTK instance `rtkUserTeamApi` (no new createApi). Kept for Product: default store export, `useGetUserTeamQuery({page,limit:-1})` (legacy `GET /user-team`), `useCreateUserTeamMutation`, type `IUserTeam`. Every team write invalidates `TEAM_WRITE_TAGS` (lookup + manage list + detail).
+- Decisions (W1–W7): service tab = one content type at a time (Kênh type 1 excluded) with SelectableTable + Save (final set); assign = `ChannelTransferList` right side is the FINAL set, inactive team rows show badge "Đang tắt" and are reactivated, client-side confirm summary (add/reactivate/remove), new-channel TVOD/TSTV default team value or 7/120; compare copy-all confirms by typing target team NAME (teams rarely have codes); subject tab replicates CMS1 jquery.tree check semantics in `applyCms1Check`; Net/Flexi sync shows a host-error modal when not ok.
+- Promoted to shared: `tables/tableCells` (ALIGN_*, orDash, dateCell), `utils/yupRules.wholeNumber`, `selects/{lookupOptionFilters,areaCodes,AreaLookupMultiSelect}`, `NumberLookupSelect.excludeValues`, `ChannelTransferList` item `badge` (Badge must be `shrink-0`: Firefox narrow viewport collapsed it to 0 px). Deleted `custom/Select/UserTeamSelect` (unused).
+- Web no longer calls these API endpoints (API may drop in a separate feature; Channel screen `content/Channel/Info` and product-legacy `GET /user-team/:productId` still use their own paths): get-user-team-channel, get-tvod-options/:id, get-tstv-options/:id, update-user-team-channel-status, update-user-team-channel, delete-user-team-channel:id, get-user-team-service, update-user-team-service, get-detail/:id, get-user-team-subject, delete-user-team-subject/:id.
+- Env gotchas: web node_modules lacks `eslint-plugin-prettier`/`eslint-config-prettier` (lint with a temp config without them); a combined TS5 check over ~90 files needs `--max-old-space-size=3584` (default heap OOMs); in e2e, click hover-only ChannelTransferCard "+" is unreliable — use "Chọn tất cả".
+- Verified: vitest 25 files, TS5 combined (negative control), Playwright `business-rule-user-team` (6 mocked cases) + `business-rule-service` on Chromium and Firefox, desktop + mobile, writes blocked.
