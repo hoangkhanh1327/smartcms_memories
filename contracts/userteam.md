@@ -11,7 +11,7 @@ links:
   - repos/web.md
   - contracts/product.md
   - contracts/service.md
-updated: '2026-11-25'
+updated: '2026-11-26'
 ---
 # User Team ("User Team" / nhóm thuê bao) — API contract (feature api 020 / web next)
 
@@ -36,3 +36,9 @@ Page `/business-rule/user-team`, `menu_key` = `user-team` (member DB `cmssmart_a
 - No `GET /user-team/:id` — that path belongs to product-legacy (`/user-team/:product_id`); use `manage/:id`.
 - Deleting a team without members can take ~15 s (full scan of member_mytv until DBA adds an index).
 - Deploy order: grant `user-team.*` → API → web. Keep RTK hook names (`useGetUserTeamQuery`, `useCreateUserTeamMutation`) and type `IUserTeam` used by Product.
+
+## Updates after code review (2026-11-26)
+- `POST /user-team/channel` now writes `sort_order = 0` (team's own order) instead of the channel number.
+- `POST /:id/duplicate` returns the new user_team row (has `id`); copies `code, service_vmp_id, description, tvod, tstv` (not `channel_changed`).
+- `GET :id/channels/assignable` pre-checks rows that are currently **inactive** (`team_status = 0`); saving the assign form unchanged re-activates them. The web must show the state and let the user uncheck before saving.
+- Net sync hosts come from optional env `USER_TEAM_SUBJECT_HOSTS` (comma list; empty = the 4 default MyTV Net hosts).
