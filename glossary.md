@@ -2,11 +2,11 @@
 title: Glossary
 tags:
   - glossary
-updated: '2026-09-04'
+updated: '2026-11-26'
 summary: >-
   Domain terms shared across repos. English definitions; Vietnamese terms of art
   kept verbatim with a gloss.
-status: draft
+status: ready
 links:
   - repos/api.md
   - contracts/ai-dubbing.md
@@ -101,3 +101,5 @@ Added 2026-09-04 from `src/modules/content/ai_dubling/` — full contract in
 - **Outbox event** (`outbox_event`) — a durable record written in the same breath as a queue
   dispatch, so a reconciliation cron can re-enqueue work the queue never received. Internal; never
   exposed to the frontend.
+
+- **Phim trả phí (TVOD)** — a MOVIE whose service has `services.charging > 0`, any TYPE_ID (since 2026-11-26; previously limited to TYPE_ID = 20 "Galaxy TVOD"). Source: the SP snippet `select charging into v_charging from services where service_id = p_service_id; IF v_charging > 0 THEN select price_sd ...`. Rule: a paid movie cannot have CONTENT_PACKAGE DayUp (id 6) — enforced in api `movie-edit-side-effects.service.ts` (`assertTvodHasNoDayUp`) and web `Movie/Info/utils/contentPackageRule.ts` (`isPaidMovie`). MOVIE_PRICE still comes from `price_ott` (price_sd not used by CMS).
