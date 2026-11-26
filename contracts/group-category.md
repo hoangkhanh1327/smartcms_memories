@@ -18,7 +18,7 @@ links:
   - contracts/content-cate.md
   - contracts/content-cate-sub.md
   - contracts/tpw-menu-cate.md
-updated: '2026-10-22'
+updated: '2026-11-26'
 ---
 # Category groups — feature 014
 
@@ -55,3 +55,8 @@ updated: '2026-10-22'
 - Opened by the "Thể loại" button on `/content/group-category`; `GroupCategoryCateController` `@RouteInfo` `menu_key` is
   now `group-category`; `group-category-cate.*` level-4 rows moved under it and the `group-category-cate` level-3 row is
   inactive. Full details: contracts/sports.md "Change 2026-10-22".
+
+## Change 2026-11-26 — one logo
+- Client uploads only `LOGO_TV` (1920x1080, no cropping) via `media-upload/group-category`; the GROUP_CATEGORY media rule now has only the `LOGO_TV` slot (uploads to LOGO_PHONE / LOGO_TV_SMALL → 400).
+- `LOGO_PHONE` / `LOGO_TV_SMALL` are read-only in the body contract (sending them → 400); on create / when LOGO_TV changes the server writes the same URL to all three columns (same pattern as SPORTS.LOGO_TV_SMALL). Existing rows keep their old distinct logos until the logo is changed.
+- Web form `VOD/GroupCategory` shows a single "Logo (1920x1080)" field; the list still shows the three columns.
